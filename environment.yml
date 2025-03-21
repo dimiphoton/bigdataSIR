@@ -1,0 +1,14 @@
+name: seir_project_env
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - pymc
+  - numpy
+  - theano
+  - matplotlib
+  - graphviz
+  - streamlit  # For web application simulation
+  - pip
+  - pip:
+      - some-pip-package  # Add any additional pip packages here if needed

@@ -1,0 +1,15 @@
+// Epidemiological Model
+digraph {
+	S [label=Susceptible shape=box]
+	E [label=Exposed shape=box]
+	I [label=Infected shape=box]
+	H [label=Hospitalized shape=box]
+	R [label=Recovered shape=box]
+	D [label=Deceased shape=box]
+	S -> E [label=Exposure]
+	E -> I [label=Infection]
+	I -> H [label=Hospitalization]
+	I -> R [label=Recovery]
+	H -> R [label=Recovery]
+	H -> D [label=Death]
+}
