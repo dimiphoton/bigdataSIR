@@ -1,43 +1,71 @@
-import json
+import numpy as np
 import pandas as pd
+import arviz as az
+from seir_model import SEIRModel
 
-def load_inferred_parameters(file_path='inferred_parameters.json'):
-    """
-    Load inferred parameters from a JSON file.
+def simulate_from_posterior(trace, n_simulations=100, days=60, population=1_000_000, initial_state=None,
+                             sens=0.85, spec=1.0):
+    if initial_state is None:
+        initial_state = {
+            'S': population - 10,
+            'E': 5,
+            'I': 5,
+            'Sym': 0,
+            'Asym': 0,
+            'Hosp': 0,
+            'R': 0,
+            'D': 0
+        }
 
-    Parameters:
-    - file_path (str): Path to the JSON file containing inferred parameters.
+    posterior = trace.posterior.stack(draws=("chain", "draw"))
+    n_available = posterior.draws.size
 
-    Returns:
-    - dict: Inferred parameters.
-    """
-    with open(file_path, 'r') as f:
-        parameters = json.load(f)
-    return parameters
+    simulations = []
 
-def simulate_epidemic(model, initial_conditions, time_steps, parameters_file='inferred_parameters.json'):
-    """
-    Simulate the epidemic spread using inferred parameters.
+    for i in range(n_simulations):
+        sample_idx = np.random.randint(n_available)
+        sample = posterior.isel(draws=sample_idx)
 
-    Parameters:
-    - model (EpidemiologicalModel): The epidemiological model instance.
-    - initial_conditions (dict): Initial number of individuals in each state.
-    - time_steps (int): Number of time steps to simulate.
-    - parameters_file (str): Path to the JSON file containing inferred parameters.
+        model = SEIRModel(
+            beta=float(sample['beta']),
+            sigma=float(sample['sigma']),
+            p_sym=float(sample['p_sym']),
+            gamma=float(sample['gamma']),
+            hosp_rate=float(sample['hosp_rate']),
+            mu=float(sample['mu']),
+            p_test=float(sample['p_test']),
+            sens=sens,
+            spec=spec,
+            S0=initial_state['S'],
+            E0=initial_state['E'],
+            I0=initial_state['I'],
+            R0=initial_state['R'],
+            stochastic=True
+        )
 
-    Returns:
-    - pd.DataFrame: Simulated data.
-    """
-    # Load inferred parameters
-    parameters = load_inferred_parameters(parameters_file)
+        state = (
+            initial_state['S'], initial_state['E'], initial_state['I'],
+            initial_state['Sym'], initial_state['Asym'], initial_state['Hosp'],
+            initial_state['R'], initial_state['D']
+        )
 
-    # Update model parameters
-    model.beta = parameters['beta']
-    model.sigma = parameters['sigma']
-    model.gamma = parameters['gamma']
-    model.h = parameters['h']
-    model.mu = parameters['mu']
+        sim_result = []
+        for day in range(days):
+            sim_result.append(state)
+            state = model.step(state)
 
-    # Simulate the epidemic spread
-    simulated_data = model.simulate(initial_conditions, time_steps)
-    return simulated_data
+        sim_df = pd.DataFrame(sim_result, columns=['S', 'E', 'I', 'Sym', 'Asym', 'Hosp', 'R', 'D'])
+        sim_df['day'] = np.arange(days)
+        sim_df['simulation'] = i
+        simulations.append(sim_df)
+
+    return pd.concat(simulations, ignore_index=True)
+
+
+# Example usage
+if __name__ == '__main__':
+    trace = az.from_netcdf("posterior_trace.nc")
+    results = simulate_from_posterior(trace, n_simulations=100, days=60)
+
+    # Save for later visualization
+    results.to_csv("simulated_trajectories.csv", index=False)

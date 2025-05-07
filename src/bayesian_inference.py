@@ -1,36 +1,44 @@
 import pymc as pm
-import json
+import numpy as np
+import pandas as pd
+import arviz as az
+from model import SEIRModel
 
-def infer_parameters(data, output_file='inferred_parameters.json'):
-    """
-    Infer model parameters using Bayesian inference with PyMC and save them to a file.
+def run_inference(data, population=1_000_000):
+    days = len(data)
+    observed_positives = data['num_positive'].values
+    observed_hospitalised = data['num_hospitalised'].values
 
-    Parameters:
-    - data (pd.DataFrame): Preprocessed data.
-    - output_file (str): Path to save the inferred parameters.
-
-    Returns:
-    - dict: Inferred parameters with credible intervals.
-    """
     with pm.Model() as model:
-        # Define priors
+        # Priors
         beta = pm.Normal('beta', mu=0.3, sigma=0.1)
-        sigma = pm.Normal('sigma', mu=0.2, sigma=0.1)
-        gamma = pm.Normal('gamma', mu=0.1, sigma=0.1)
-        h = pm.Normal('h', mu=0.1, sigma=0.1)
-        mu = pm.Normal('mu', mu=0.05, sigma=0.05)
+        sigma = pm.Normal('sigma', mu=1/3.0, sigma=0.2)
+        p_sym = pm.Uniform('p_sym', lower=0.5, upper=0.7)
+        gamma = pm.Normal('gamma', mu=1/7.0, sigma=0.1)
+        hosp_rate = pm.Beta('hosp_rate', alpha=2, beta=20)
+        mu = pm.Beta('mu', alpha=2, beta=50)
+        p_test = pm.Uniform('p_test', lower=0.5, upper=1.0)
+        sens = pm.Uniform('sens', lower=0.7, upper=0.9)
 
-        # Define likelihood
-        # Implement the likelihood function based on the model and data
+        # Initial conditions
+        E0 = pm.DiscreteUniform('E0', lower=1, upper=100)
+        I0 = pm.DiscreteUniform('I0', lower=1, upper=100)
+        S0 = population - E0 - I0
+        R0 = 0
 
-        # Inference
-        trace = pm.sample(1000, tune=1000, return_inferencedata=True)
+        seir = SEIRModel(beta, sigma, p_sym, gamma, hosp_rate, mu, S0, E0, I0, R0, p_test, sens, 1.0)
+        sim = seir.simulate(days)
 
-    # Summarize the results
-    summary = pm.summary(trace, credible_interval=0.95)
+        # Likelihoods
+        pm.Poisson('obs_positive', mu=sim['positive_tests'], observed=observed_positives)
+        pm.Normal('obs_hospitalised', mu=sim['hospitalised'], sigma=10, observed=observed_hospitalised)
 
-    # Save inferred parameters to a JSON file
-    with open(output_file, 'w') as f:
-        json.dump(summary['mean'].to_dict(), f)
+        trace = pm.sample(1000, tune=1000, target_accept=0.9, return_inferencedata=True)
+        az.to_netcdf(trace, 'posterior_trace.nc')
 
-    return summary
+    return trace
+
+if __name__ == "__main__":
+    data = pd.read_csv("data/epidemic_data.csv")
+    trace = run_inference(data)
+    print(trace.posterior)
