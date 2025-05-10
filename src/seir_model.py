@@ -1,62 +1,47 @@
+# 📁 seir_model.py
+
 import numpy as np
 
-class SEIRModel:
-    def __init__(self, beta, sigma, p_sym, gamma, hosp_rate, mu, S0, E0, I0, R0, p_test, sens, spec, stochastic=False):
-        self.beta = beta
-        self.sigma = sigma
-        self.p_sym = p_sym
-        self.gamma = gamma
-        self.hosp_rate = hosp_rate
-        self.mu = mu
-        self.S0 = S0
-        self.E0 = E0
-        self.I0 = I0
-        self.R0 = R0
-        self.p_test = p_test
-        self.sens = sens
-        self.spec = spec
+class SEIRSimulator:
+    def __init__(self, N, params, stochastic=True):
+        self.N = N
+        self.params = params
         self.stochastic = stochastic
-        self.N = S0 + E0 + I0 + R0  # Total population size
-        self.parameters = {
-            'beta': beta,
-            'sigma': sigma,
-            'p_sym': p_sym,
-            'gamma': gamma,
-            'hosp_rate': hosp_rate,
-            'mu': mu,
-            'p_test': p_test,
-            'sens': sens,
-            'spec': spec
-        }
 
-    def derivatives(self, S, E, I, Sym, Asym, Hosp, R, D):
+    def _transition(self, n, p):
         if self.stochastic:
-            beta = np.random.normal(self.beta, 0.01 * abs(self.beta))
-            sigma = np.random.normal(self.sigma, 0.01 * abs(self.sigma))
-            p_sym = np.clip(np.random.normal(self.p_sym, 0.01 * abs(self.p_sym)), 0, 1)
-            gamma = np.random.normal(self.gamma, 0.01 * abs(self.gamma))
-            hosp_rate = np.random.normal(self.hosp_rate, 0.01 * abs(self.hosp_rate))
-            mu = np.random.normal(self.mu, 0.01 * abs(self.mu))
+            return np.random.binomial(n, p)
         else:
-            beta, sigma, p_sym, gamma, hosp_rate, mu = self.beta, self.sigma, self.p_sym, self.gamma, self.hosp_rate, self.mu
-
-        # Derivatives for the SEIR model
-        dS = -beta * S * I / self.N
-        dE = beta * S * I / self.N - sigma * E
-        dI = sigma * E - I
-        dSym = p_sym * I - hosp_rate * Sym - gamma * Sym
-        dAsym = (1 - p_sym) * I - gamma * Asym
-        dHosp = hosp_rate * Sym - mu * Hosp
-        dR = gamma * (Sym + Asym) + (1 - mu) * Hosp
-        dD = mu * Hosp
-
-        return dS, dE, dI, dSym, dAsym, dHosp, dR, dD
+            return round(n * p)
 
     def step(self, state):
-        # Use the derivatives method to get the rate of change for the state
-        dS, dE, dI, dSym, dAsym, dHosp, dR, dD = self.derivatives(*state)
+        S, E, I, H, ICU, R, D = state
+        p = self.params
 
-        # Update the state by adding the derivatives
-        state = tuple(max(0, s + ds) for s, ds in zip(state, (dS, dE, dI, dSym, dAsym, dHosp, dR, dD)))
+        new_exposed = self._transition(S, p["beta"] * I / self.N)
+        new_infectious = self._transition(E, p["sigma"])
+        new_recovered_I = self._transition(I, p["gamma_I"])
+        new_hospitalized = self._transition(I - new_recovered_I, p["h_rate"])
 
-        return state
+        new_recovered_H = self._transition(H, p["gamma_H"])
+        new_icu = self._transition(H - new_recovered_H, p["icu_rate"])
+
+        new_recovered_ICU = self._transition(ICU, p["gamma_ICU"])
+        new_dead = self._transition(ICU - new_recovered_ICU, p["mu"])
+
+        S -= new_exposed
+        E += new_exposed - new_infectious
+        I += new_infectious - new_recovered_I - new_hospitalized
+        H += new_hospitalized - new_recovered_H - new_icu
+        ICU += new_icu - new_recovered_ICU - new_dead
+        R += new_recovered_I + new_recovered_H + new_recovered_ICU
+        D += new_dead
+
+        return [S, E, I, H, ICU, R, D]
+
+    def simulate(self, initial_state, days):
+        history = [initial_state]
+        for _ in range(days):
+            next_state = self.step(history[-1])
+            history.append(next_state)
+        return np.array(history)
