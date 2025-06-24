@@ -1,0 +1,41 @@
+import numpy as np
+
+def seir_step(state, params, N):
+    S, E, I, H, ICU, R, D = state
+
+    new_E = params["beta"] * S * I / N
+    new_I = E / params["incubation"]
+    new_H = I * params["h_rate"] / params["symptomatic"]
+    I_after_H = I - new_H
+    new_R_from_I = I_after_H * (1 - params["h_rate"]) / params["symptomatic"]
+    new_ICU = H * params["icu_rate"] / params["h_duration"]
+    H_after_ICU = H - new_ICU
+    new_R_from_H = H_after_ICU * (1 - params["icu_rate"]) / params["h_duration"]
+    new_D = ICU * params["mu"] / params["icu_duration"]
+    ICU_after_D = ICU - new_D
+    new_R_from_ICU = ICU_after_D * (1 - params["mu"]) / params["icu_duration"]
+
+    next_state = np.array([
+        S - new_E,
+        E + new_E - new_I,
+        I + new_I - new_H - new_R_from_I,
+        H + new_H - new_ICU - new_R_from_H,
+        ICU + new_ICU - new_D - new_R_from_ICU,
+        R + new_R_from_I + new_R_from_H + new_R_from_ICU,
+        D + new_D
+    ])
+
+    next_state = np.clip(next_state, 0, N)
+    return next_state, new_I
+
+def simulate(initial_state, params, N, days):
+    states = [np.array(initial_state, dtype=float)]
+    new_I_values = []
+
+    for _ in range(days):
+        next_state, new_I = seir_step(states[-1], params, N)
+        states.append(next_state)
+        new_I_values.append(new_I)
+
+    return np.array(states), np.array(new_I_values)
+

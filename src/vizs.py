@@ -1,26 +1,23 @@
 import plotly.express as px
-import pandas as pd
+import numpy as np
 
-def create_dynamic_visualization(dataframe,x,y):
+def create_dynamic_visualization(x, y, x_label="x", y_label="y"):
     """
-    Crée le graphe nouvelles infections / total infectés à partir des colonnes spécifiées d'un DataFrame pandas.
+    Create an interactive log-log scatter plot from two arrays.
 
-    Paramètres :
-    df (pd.DataFrame) : Le DataFrame contenant les données.
-    x (str) : Le nom de la colonne à utiliser pour l'axe x.
-    y (str) : Le nom de la colonne à utiliser pour l'axe y.
+    Parameters:
+    x (array-like): Values for the x-axis.
+    y (array-like): Values for the y-axis.
+    x_label (str): Label for the x-axis.
+    y_label (str): Label for the y-axis.
 
-    Retourne :
+    Returns:
     None
     """
-
-    # Create the interactive log log plot with dataframe[x] as x and dataframe[y] as y
-
-    fig = px.scatter(dataframe, x, y, log_x=True, log_y=True)
-
-    # Show the plot
+    fig = px.scatter(x=x, y=y, log_x=True, log_y=True, labels={"x": x_label, "y": y_label})
     fig.show()
 
 # Example usage
-# simulated_data = pd.DataFrame({'Total Infected': [...], 'New Infected': [...]})
-# create_dynamic_visualization(simulated_data)
+# x = np.array([...])
+# y = np.array([...])
+# create_dynamic_visualization(x, y, "Total Infected", "New Infected")

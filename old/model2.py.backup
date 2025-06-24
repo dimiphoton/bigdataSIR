@@ -1,0 +1,189 @@
+"""
+Epidemiological Model Definition
+
+This module defines the SEIHRD (Susceptible-Exposed-Infected-Hospitalized-Recovered-Deceased)
+epidemiological model using PyMC for Bayesian inference.
+
+Classes:
+    SEIHRDModel: Main epidemiological model class
+    
+Functions:
+    create_pymc_model: Creates PyMC model with priors and likelihood
+    solve_ode_system: Solves the ODE system for given parameters
+"""
+
+import numpy as np
+import pymc as pm
+from typing import Dict, Tuple, Optional, Union
+from dataclasses import dataclass
+import warnings
+
+@dataclass
+class ModelParameters:
+    """Container for epidemiological model parameters."""
+    beta: float  # Transmission rate
+    sigma: float  # Incubation rate (1/incubation_period)
+    gamma: float  # Recovery rate
+    h: float      # Hospitalization rate
+    mu: float     # Death rate
+    N: int        # Total population
+
+class SEIHRDModel:
+    """
+    SEIHRD Epidemiological Model
+    
+    A compartmental model for infectious disease spread with hospitalization
+    and death compartments.
+    """
+    
+    def __init__(self, 
+                 initial_conditions: Dict[str, int],
+                 time_points: np.ndarray,
+                 population_size: int):
+        """
+        Initialize the SEIHRD model.
+        
+        Args:
+            initial_conditions: Dictionary with initial values for S, E, I, H, R, D
+            time_points: Array of time points for simulation
+            population_size: Total population size
+        """
+        self.initial_conditions = initial_conditions
+        self.time_points = time_points
+        self.population_size = population_size
+        self._validate_initial_conditions()
+    
+    def _validate_initial_conditions(self) -> None:
+        """Validate that initial conditions sum to population size."""
+        total = sum(self.initial_conditions.values())
+        if total != self.population_size:
+            raise ValueError(f"Initial conditions sum to {total}, expected {self.population_size}")
+    
+    def solve_ode_system(self, 
+                        params: ModelParameters,
+                        method: str = 'RK45') -> Dict[str, np.ndarray]:
+        """
+        Solve the SEIHRD ODE system.
+        
+        Args:
+            params: Model parameters
+            method: ODE solver method ('RK45', 'BDF', etc.)
+            
+        Returns:
+            Dictionary with time series for each compartment
+        """
+        from scipy.integrate import solve_ivp
+        
+        def ode_system(t, y):
+            S, E, I, H, R, D = y
+            
+            # SEIHRD differential equations
+            dS_dt = -params.beta * S * I / params.N
+            dE_dt = params.beta * S * I / params.N - params.sigma * E
+            dI_dt = params.sigma * E - params.gamma * I - params.h * I
+            dH_dt = params.h * I - params.gamma * H - params.mu * H
+            dR_dt = params.gamma * (I + H)
+            dD_dt = params.mu * H
+            
+            return [dS_dt, dE_dt, dI_dt, dH_dt, dR_dt, dD_dt]
+        
+        # Initial conditions
+        y0 = [
+            self.initial_conditions['S'],
+            self.initial_conditions['E'],
+            self.initial_conditions['I'],
+            self.initial_conditions['H'],
+            self.initial_conditions['R'],
+            self.initial_conditions['D']
+        ]
+        
+        # Solve ODE system
+        solution = solve_ivp(
+            ode_system,
+            [self.time_points[0], self.time_points[-1]],
+            y0,
+            t_eval=self.time_points,
+            method=method
+        )
+        
+        return {
+            'S': solution.y[0],
+            'E': solution.y[1],
+            'I': solution.y[2],
+            'H': solution.y[3],
+            'R': solution.y[4],
+            'D': solution.y[5]
+        }
+
+def create_pymc_model(observed_data: Dict[str, np.ndarray],
+                     time_points: np.ndarray,
+                     population_size: int) -> pm.Model:
+    """
+    Create PyMC model for Bayesian inference.
+    
+    Args:
+        observed_data: Dictionary with observed time series
+        time_points: Time points for observations
+        population_size: Total population size
+        
+    Returns:
+        PyMC model object
+    """
+    with pm.Model() as model:
+        # Prior distributions for parameters
+        beta = pm.LogNormal('beta', mu=np.log(0.3), sigma=0.5)
+        sigma = pm.LogNormal('sigma', mu=np.log(0.2), sigma=0.3)
+        gamma = pm.LogNormal('gamma', mu=np.log(0.1), sigma=0.3)
+        h = pm.LogNormal('h', mu=np.log(0.05), sigma=0.3)
+        mu = pm.LogNormal('mu', mu=np.log(0.01), sigma=0.3)
+        
+        # Create model instance
+        seihrd_model = SEIHRDModel(
+            initial_conditions={'S': population_size-10, 'E': 5, 'I': 5, 'H': 0, 'R': 0, 'D': 0},
+            time_points=time_points,
+            population_size=population_size
+        )
+        
+        # Solve ODE system
+        params = ModelParameters(beta=beta, sigma=sigma, gamma=gamma, h=h, mu=mu, N=population_size)
+        solution = seihrd_model.solve_ode_system(params)
+        
+        # Likelihood for observed data
+        for compartment, data in observed_data.items():
+            if compartment in solution:
+                pm.Normal(f'{compartment}_obs', 
+                         mu=solution[compartment], 
+                         sigma=10.0,  # Observation noise
+                         observed=data)
+    
+    return model
+
+if __name__ == "__main__":
+    N = 1000000
+    days = 30
+    np.random.seed(42)
+
+    # Simulate some fake observations (replace with your actual data)
+    true_I = np.linspace(5, 1000, days + 1)
+    true_H = np.linspace(2, 300, days + 1)
+    true_ICU = np.linspace(1, 100, days + 1)
+    true_D = np.linspace(0, 50, days + 1)
+
+    observed_infected = true_I + np.random.normal(0, 20, size=days + 1)
+    observed_hospitalized = true_H + np.random.normal(0, 10, size=days + 1)
+    observed_icu = true_ICU + np.random.normal(0, 5, size=days + 1)
+    observed_deaths = true_D + np.random.normal(0, 3, size=days + 1)
+
+    model = create_pymc_model({
+        'I': observed_infected,
+        'H': observed_hospitalized,
+        'ICU': observed_icu,
+        'D': observed_deaths
+    }, np.linspace(0, days, days + 1), N)
+
+    with model:
+        trace = pm.sample(500, tune=500, target_accept=0.9, return_inferencedata=True)
+
+    print(az.summary(trace, var_names=[
+        "beta", "sigma", "gamma", "h", "mu", "I_obs", "H_obs", "ICU_obs", "D_obs"
+    ]))

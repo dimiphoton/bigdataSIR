@@ -1,4 +1,4 @@
-name: sei 
+name: seir_project_env
 channels:
   - conda-forge
   - defaults
@@ -9,6 +9,7 @@ dependencies:
   - numpy
   - matplotlib
   - pandas
+  - scipy  # Add this for ODE solving
   - daft
   - streamlit
   - mamba

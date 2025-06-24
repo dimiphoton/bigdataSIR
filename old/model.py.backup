@@ -1,0 +1,127 @@
+import pymc as pm
+import pytensor.tensor as pt
+from pytensor.scan import scan
+import arviz as az
+import numpy as np
+
+def seir_step(state, beta, incubation, symptomatic, h_rate, h_duration, icu_rate, icu_duration, mu, N):
+    S, E, I, H, ICU, R, D = state
+
+    new_E = beta * S * I / N
+    new_I = E / incubation
+    new_H = I * h_rate / symptomatic
+    I_after_H = I - new_H
+    new_R_from_I = I_after_H * (1 - h_rate) / symptomatic
+    new_ICU = H * icu_rate / h_duration
+    H_after_ICU = H - new_ICU
+    new_R_from_H = H_after_ICU * (1 - icu_rate) / h_duration
+    new_D = ICU * mu / icu_duration
+    ICU_after_D = ICU - new_D
+    new_R_from_ICU = ICU_after_D * (1 - mu) / icu_duration
+
+    next_state = pt.stack([
+        S - new_E,
+        E + new_E - new_I,
+        I + new_I - new_H - new_R_from_I,
+        H + new_H - new_ICU - new_R_from_H,
+        ICU + new_ICU - new_D - new_R_from_ICU,
+        R + new_R_from_I + new_R_from_H + new_R_from_ICU,
+        D + new_D
+    ])
+    return pt.clip(next_state, 0, N)
+
+def seir_simulate(initial_state, beta, incubation, symptomatic, h_rate, h_duration, icu_rate, icu_duration, mu, N, days):
+    def step_fn(state, beta, incubation, symptomatic, h_rate, h_duration, icu_rate, icu_duration, mu, N):
+        return (seir_step(state, beta, incubation, symptomatic, h_rate, h_duration, icu_rate, icu_duration, mu, N),)
+
+    outputs, _ = scan(
+        fn=step_fn,
+        sequences=[],
+        outputs_info=initial_state,
+        non_sequences=[beta, incubation, symptomatic, h_rate, h_duration, icu_rate, icu_duration, mu, N],
+        n_steps=days
+    )
+    return pt.concatenate([initial_state[None, :], outputs], axis=0)
+
+def build_model(N, days, observed_infected, observed_hospitalized, observed_icu, observed_deaths):
+    with pm.Model() as model:
+        # Priors
+        beta = pm.LogNormal("beta", mu=0, sigma=1)
+        incubation = pm.LogNormal("incubation", mu=1, sigma=0.5)
+        symptomatic = pm.LogNormal("symptomatic", mu=1, sigma=0.5)
+        h_rate = pm.Beta("h_rate", alpha=2, beta=5)
+        h_duration = pm.LogNormal("h_duration", mu=1, sigma=0.5)
+        icu_rate = pm.Beta("icu_rate", alpha=2, beta=5)
+        icu_duration = pm.LogNormal("icu_duration", mu=1, sigma=0.5)
+        mu = pm.Beta("mu", alpha=2, beta=5)
+
+        I0 = pm.DiscreteUniform("I0", lower=1, upper=100)
+        E0 = pm.DiscreteUniform("E0", lower=1, upper=100)
+
+        initial_state = pt.stack([
+            N - I0 - E0,  # S
+            E0,           # E
+            I0,           # I
+            0.,           # H
+            0.,           # ICU
+            0.,           # R
+            0.            # D
+        ]).astype("float64")
+
+        sim = seir_simulate(
+            initial_state, beta, incubation, symptomatic, h_rate, h_duration,
+            icu_rate, icu_duration, mu, N, days
+        )
+
+        # Extract simulated compartments
+        mu_I = sim[:, 2]
+        mu_H = sim[:, 3]
+        mu_ICU = sim[:, 4]
+        mu_D = sim[:, 6]
+
+        # Adjust length if needed
+        if observed_infected.shape[0] == days:
+            mu_I = mu_I[1:]
+            mu_H = mu_H[1:]
+            mu_ICU = mu_ICU[1:]
+            mu_D = mu_D[1:]
+
+        # Observation noise
+        sigma_I = pm.HalfNormal("sigma_I", sigma=5)
+        sigma_H = pm.HalfNormal("sigma_H", sigma=5)
+        sigma_ICU = pm.HalfNormal("sigma_ICU", sigma=5)
+        sigma_D = pm.HalfNormal("sigma_D", sigma=5)
+
+        # Likelihoods
+        pm.Normal("obs_I", mu=mu_I, sigma=sigma_I, observed=observed_infected)
+        pm.Normal("obs_H", mu=mu_H, sigma=sigma_H, observed=observed_hospitalized)
+        pm.Normal("obs_ICU", mu=mu_ICU, sigma=sigma_ICU, observed=observed_icu)
+        pm.Normal("obs_D", mu=mu_D, sigma=sigma_D, observed=observed_deaths)
+
+    return model
+
+if __name__ == "__main__":
+    N = 1000000
+    days = 30
+    np.random.seed(42)
+
+    # Simulate some fake observations (replace with your actual data)
+    true_I = np.linspace(5, 1000, days + 1)
+    true_H = np.linspace(2, 300, days + 1)
+    true_ICU = np.linspace(1, 100, days + 1)
+    true_D = np.linspace(0, 50, days + 1)
+
+    observed_infected = true_I + np.random.normal(0, 20, size=days + 1)
+    observed_hospitalized = true_H + np.random.normal(0, 10, size=days + 1)
+    observed_icu = true_ICU + np.random.normal(0, 5, size=days + 1)
+    observed_deaths = true_D + np.random.normal(0, 3, size=days + 1)
+
+    model = build_model(N, days, observed_infected, observed_hospitalized, observed_icu, observed_deaths)
+
+    with model:
+        trace = pm.sample(500, tune=500, target_accept=0.9, return_inferencedata=True)
+
+    print(az.summary(trace, var_names=[
+        "beta", "incubation", "symptomatic", "h_rate", "h_duration",
+        "icu_rate", "icu_duration", "mu", "sigma_I", "sigma_H", "sigma_ICU", "sigma_D", "I0", "E0"
+    ]))
