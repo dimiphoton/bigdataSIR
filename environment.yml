@@ -1,4 +1,4 @@
-name: seir_project_env
+name: seir_pymc_env
 channels:
   - conda-forge
   - defaults
@@ -13,3 +13,4 @@ dependencies:
   - daft
   - streamlit
   - mamba
+  - aesara

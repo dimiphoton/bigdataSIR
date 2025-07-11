@@ -46,7 +46,7 @@ def load_posterior_samples(trace_path: str,
         print(f"Warning: Requested {n_samples} samples but only {total_samples} available")
     
     sample_indices = np.random.choice(total_samples, n_samples, replace=False)
-    
+
     # Extract parameter values for selected samples
     samples = []
     for idx in sample_indices:
@@ -115,7 +115,7 @@ def forecast_from_trace(trace_path: str = "results/trace.nc",
     # Load posterior samples
     print(f"Loading {n_samples} posterior samples from {trace_path}...")
     samples = load_posterior_samples(trace_path, param_names, n_samples)
-    
+
     # Generate forecasts for each sample
     all_states = []
     all_new_I = []
