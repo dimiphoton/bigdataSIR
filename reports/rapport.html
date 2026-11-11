@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Rapport SEIR bayésien</title>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  }
+};
+</script>
+<script
+  src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"
+  async></script>
+<style>
+body {
+  font-family: "Segoe UI", sans-serif;
+  max-width: 48rem;
+  margin: 2rem auto;
+  line-height: 1.5;
+  color: #1c1c1c;
+  padding: 0 1rem;
+}
+img { max-width: 100%; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+th, td { border: 1px solid #ccc; padding: 0.3rem 0.5rem; text-align: left; }
+code { background: #f4f4f4; padding: 0.1rem 0.3rem; }
+pre { background: #f4f4f4; padding: 0.8rem; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>Rapport</h1>
+<p>Ville de 1 000 000 habitants, du 2 octobre 2020 au 31 janvier 2021. Document généré, graine 0. Le développement long est dans <code>docs/framework-bayesien.md</code>.</p>
+<h2>1. Contexte</h2>
+<p>Le cours publiait chaque jour des séries partielles. La décision consiste à rester sous 1 500 hospitalisés et 300 soins intensifs jusqu'au 31 janvier 2021, avec l'intervention la moins contraignante. L'approche bayésienne produit P(saturation), pas une trajectoire unique.</p>
+<h2>2. Données</h2>
+<p>Colonnes publiées : cas confirmés, tests, hospitalisés, hospitalisations cumulées, soins intensifs, décès cumulés. La sensibilité annoncée va de 70 % à 85 %, la spécificité vaut 100 %, et au moins 50 % des symptomatiques sont testés. Sur les 14 derniers jours de cas confirmés du fichier du cours, la pente de log(1 + cas) vaut 0,07 par jour, soit un temps de doublement d'environ 9,84 jours.</p>
+<h2>3. Modèle</h2>
+<p>Variante A, 2 groupes d'âge, \(\beta(t)\) en marche aléatoire hebdomadaire. L'incubation va de 1 à 5 jours, la période symptomatique de 4 à 10 jours, la fraction symptomatique de 50 % à 70 %.</p>
+<img alt="Compartiments" src="../docs/generated/figures/compartiments.png">
+<table><tr><th>Paramètre</th><th>Loi</th><th>Paramètres</th><th>Intervalle à 95 %</th><th>Source</th><th>Justification</th></tr><tr><td>Durée d'incubation</td><td>Log-normale</td><td>μ = 0.80, σ = 0.49</td><td>2,24 (0,86 à 5,83 j)</td><td>consigne</td><td>L'intervalle central à 90 % vaut 1 à 5 jours.</td></tr><tr><td>Durée symptomatique</td><td>Log-normale</td><td>μ = 1.84, σ = 0.28</td><td>6,32 (3,66 à 10,9 j)</td><td>consigne</td><td>L'intervalle central à 90 % vaut 4 à 10 jours, avant l'hôpital.</td></tr><tr><td>Fraction symptomatique</td><td>Beta</td><td>α = 54.7, β = 36.5</td><td>0,60 (0,50 à 0,70)</td><td>consigne</td><td>Moyenne 0,60, pour couvrir 50 à 70 % des infectés.</td></tr><tr><td>Sensibilité des tests</td><td>Beta</td><td>α = 91.5, β = 26.6</td><td>0,78 (0,70 à 0,85)</td><td>consigne</td><td>Moyenne 0,775, pour couvrir 70 à 85 %.</td></tr><tr><td>Taux de dépistage</td><td>Beta décalée</td><td>0,50 + 0,50 × Beta(2, 2)</td><td>0,75 (0,55 à 0,95)</td><td>consigne</td><td>Plancher de 50 % (consigne). La forme au-dessus est peu informative.</td></tr><tr><td>Spécificité des tests</td><td>Fixée, ou Beta</td><td>1, ou Beta(199, 1) si on l'estime</td><td>1 (fixée)</td><td>consigne</td><td>Les consignes donnent 100 %. L'estimation est une analyse de sensibilité.</td></tr><tr><td>Transmission β₀</td><td>Log-normale</td><td>μ = -3.51, σ = 0.60</td><td>0,03 (0,01 à 0,10)</td><td>hypothèse</td><td>Par contact pondéré. La médiane 0,03 vise un R de l'ordre de 1.</td></tr><tr><td>Volatilité hebdomadaire de β</td><td>Demi-normale</td><td>échelle 0.15</td><td>0,10 (0,00 à 0,34)</td><td>hypothèse</td><td>La marche aléatoire hebdomadaire reste modérée.</td></tr><tr><td>Saut de β entre deux dates</td><td>Demi-normale</td><td>échelle 0.8</td><td>0,54 (0,02 à 1,81)</td><td>hypothèse</td><td>En mode constant par morceaux, un changement peut être fort.</td></tr><tr><td>Contagiosité des asymptomatiques</td><td>Beta</td><td>α = 2, β = 2</td><td>0,50 (0,09 à 0,91)</td><td>hypothèse</td><td>Relative aux symptomatiques, moyenne 0,5, sans borne dans les consignes.</td></tr><tr><td>Durée d'hospitalisation</td><td>Log-normale</td><td>médiane 8 j, σ = 0.35</td><td>8,00 (4,03 à 15,9 j)</td><td>hypothèse</td><td>Les consignes ne donnent pas la durée de séjour.</td></tr><tr><td>Durée en soins intensifs</td><td>Log-normale</td><td>médiane 10 j, σ = 0.35</td><td>10,0 (5,04 à 19,9 j)</td><td>hypothèse</td><td>Les consignes ne donnent pas la durée de séjour.</td></tr><tr><td>Probabilité d'hospitalisation</td><td>Logit-normale hiérarchique</td><td>moyenne logit -3.89, échelle 1.0</td><td>0,02 (0,00 à 0,13)</td><td>hypothèse</td><td>Autour de 2 % chez les plus jeunes. Pas de chiffre dans les consignes.</td></tr><tr><td>Pente d'âge de la gravité</td><td>Log-normale</td><td>μ = 0.41, σ = 0.35</td><td>1,50 (0,76 à 2,98)</td><td>consigne du projet</td><td>Les plus âgés ont un prior plus élevé. La pente est positive.</td></tr><tr><td>Passage en soins intensifs</td><td>Logit-normale hiérarchique</td><td>moyenne logit -1.73</td><td>0,15 (0,02 à 0,55)</td><td>hypothèse</td><td>Parmi les sorties d'hôpital, autour de 15 %, même pente d'âge.</td></tr><tr><td>Décès en service</td><td>Logit-normale hiérarchique</td><td>moyenne logit -3.89</td><td>0,02 (0,00 à 0,13)</td><td>hypothèse</td><td>Parmi les sorties d'hôpital qui ne vont pas en soins intensifs.</td></tr><tr><td>Décès en soins intensifs</td><td>Logit-normale hiérarchique</td><td>moyenne logit -1.10</td><td>0,25 (0,04 à 0,71)</td><td>hypothèse</td><td>Parmi les sorties de soins intensifs.</td></tr><tr><td>Exposés initiaux</td><td>Log-normale</td><td>μ = 3.69, σ = 0.8</td><td>40,0 (8,34 à 192)</td><td>hypothèse</td><td>Quelques dizaines de personnes au jour 0, réparties comme la population.</td></tr><tr><td>Part initiale déjà infectieuse</td><td>Beta</td><td>α = 2, β = 5</td><td>0,26 (0,04 à 0,65)</td><td>hypothèse</td><td>Moins d'infectieux que d'exposés au départ.</td></tr><tr><td>Fond de syndromes grippaux</td><td>Log-normale</td><td>μ = 5.70, σ = 0.6</td><td>300 (92,6 à 972)</td><td>hypothèse</td><td>Tests de personnes non infectées. Les consignes ne donnent pas le niveau.</td></tr><tr><td>Surdispersion des observations</td><td>Log-normale</td><td>μ = 3.40, σ = 0.7</td><td>30,0 (7,61 à 118)</td><td>hypothèse</td><td>Variante B seulement. Variante A : concentration fixée dans le YAML.</td></tr><tr><td>Bruit de la dynamique latente</td><td>Demi-normale</td><td>échelle 1.0</td><td>0,68 (0,03 à 2,24)</td><td>hypothèse</td><td>Variante C : bruit normal, en écarts-types binomiaux.</td></tr></table>
+<img alt="Priors" src="../docs/generated/figures/priors.png">
+<h2>4. Inférence et diagnostics</h2>
+<p>nuts, 4 chaînes, 500 pas d'échauffement, 500 tirages. Seuils : R̂ sous 1,01, ESS au moins 400, au plus 0 divergence. Aucun fichier .nc dans le dossier d'inférence. Les comparaisons entre prior et posterior, le R̂ et l'ESS apparaissent après epidemic fit. R̂ lu : non calculé. ESS lu : non calculé. Divergences lues : non calculé.</p>
+<h2>5. Validation</h2>
+<p>Intervalles à 90 % : 31 % de réussite sur 80 prévisions. Intervalles à 50 % : 24 %. Les intervalles sont trop sûrs d'eux : la valeur réalisée tombe dedans moins souvent que le niveau annoncé. CRPS persistance 144, CRPS croissance 135, Brier 0,00, sur 80 prévisions naïves. Aucun score de posterior n'est enregistré. Les couvertures de cette section sont celles des références naïves, persistance et croissance exponentielle, pas encore celles du modèle.</p>
+<table><tr><th>Série</th><th>Horizon (jours)</th><th>Prévisions</th><th>Couverture 50 %</th><th>Couverture 90 %</th><th>CRPS persistance</th><th>CRPS exponentielle</th></tr><tr><td>nouveaux décès</td><td>7</td><td>8</td><td>88 %</td><td>100 %</td><td>0,43</td><td>0,51</td></tr><tr><td>nouveaux décès</td><td>14</td><td>7</td><td>86 %</td><td>86 %</td><td>0,67</td><td>0,68</td></tr><tr><td>nouveaux décès</td><td>28</td><td>5</td><td>60 %</td><td>60 %</td><td>1,26</td><td>1,16</td></tr><tr><td>soins intensifs</td><td>7</td><td>8</td><td>25 %</td><td>38 %</td><td>6,73</td><td>9,78</td></tr><tr><td>soins intensifs</td><td>14</td><td>7</td><td>14 %</td><td>29 %</td><td>12,4</td><td>29,0</td></tr><tr><td>soins intensifs</td><td>28</td><td>5</td><td>0 %</td><td>0 %</td><td>26,0</td><td>172</td></tr><tr><td>hospitalisés</td><td>7</td><td>8</td><td>0 %</td><td>0 %</td><td>83,7</td><td>46,6</td></tr><tr><td>hospitalisés</td><td>14</td><td>7</td><td>0 %</td><td>0 %</td><td>151</td><td>115</td></tr><tr><td>hospitalisés</td><td>28</td><td>5</td><td>0 %</td><td>0 %</td><td>285</td><td>168</td></tr><tr><td>cas confirmés</td><td>7</td><td>8</td><td>0 %</td><td>38 %</td><td>200</td><td>26,8</td></tr><tr><td>cas confirmés</td><td>14</td><td>7</td><td>0 %</td><td>0 %</td><td>394</td><td>113</td></tr><tr><td>cas confirmés</td><td>28</td><td>5</td><td>0 %</td><td>0 %</td><td>748</td><td>1 320</td></tr></table>
+<table><tr><th>Trajectoire</th><th>Prévisions</th><th>Couverture 90 %</th><th>CRPS persistance</th><th>CRPS exponentielle</th><th>Brier</th></tr><tr><td>niveau 0</td><td>32</td><td>69 %</td><td>11,9</td><td>3,70</td><td>0,00</td></tr><tr><td>niveau 1</td><td>32</td><td>50 %</td><td>16,8</td><td>6,58</td><td>0,00</td></tr><tr><td>niveau 2</td><td>32</td><td>53 %</td><td>25,6</td><td>10,2</td><td>0,00</td></tr><tr><td>niveau 3</td><td>32</td><td>44 %</td><td>21,9</td><td>33,1</td><td>0,00</td></tr></table>
+<p>La courbe d'apprentissage est prévue aux jours 7, 14, 21, 28, 35, 42, 49, 56, 63, 70. Un rapport de largeurs sous 0,50 est lu comme bien identifié, sous 0,85 comme partiellement identifié.</p>
+<h2>6. Projections</h2>
+<img alt="Trajectoires a priori" src="../docs/generated/figures/prior-predictive.png">
+<p>12 tirages de 60 jours, paramètres dans les priors, dynamique du scan, bruit gamma-Poisson de concentration 100. Les horizons de bulletin sont 14, 28 jours.</p>
+<h2>7. Probabilités de saturation</h2>
+<p>La saturation est le dépassement de 1 500 hospitalisés ou de 300 soins intensifs. L'événement scoré ici est le dépassement hospitalier dans les 28 jours, pour la référence naïve. Son score de Brier est 0,00. Sur cette série, le plafond d'hospitalisés n'est pas franchi dans les fenêtres scorées, et la persistance ne l'annonce presque pas. Le Brier est donc bas sans mesurer un événement qui arrive vraiment.</p>
+<img alt="Fiabilité" src="../docs/generated/figures/fiabilite.png">
+<h2>8. Recommandation</h2>
+<p>Règle : coût cumulé minimal sous P(saturation) ≤ 5 %. Autres seuils : 1 %, 5 %, 10 %, 20 %. Délai 3 jours, durée minimale 14 jours, respect 90 %. Isolement : 7, 10, 14 jours. Distanciation : 50, 60, 70 ans. Le palier 2 peut s'ouvrir plus tôt si la probabilité que les hospitalisés dépassent 750 dépasse 20 %. Le palier 3, si P(saturation) dépasse 20 %.</p>
+<table><tr><th>Mesure</th><th>Coût par jour</th></tr><tr><td>Masque</td><td>1,00</td></tr><tr><td>Isolement des cas</td><td>2,00</td></tr><tr><td>Distanciation sociale</td><td>3,00</td></tr><tr><td>Quarantaine du ménage</td><td>4,00</td></tr><tr><td>Confinement</td><td>8,00</td></tr></table>
+<img alt="Coûts" src="../docs/generated/figures/couts.png">
+<h2>9. Calibration en fin de partie</h2>
+<p>Intervalles à 90 % : 31 % de réussite sur 80 prévisions. Intervalles à 50 % : 24 %. Les intervalles sont trop sûrs d'eux : la valeur réalisée tombe dedans moins souvent que le niveau annoncé. La ventilation par niveau de stochasticité est le second tableau de la section 5. Les mêmes indicateurs seront recalculés sur les tirages du modèle dès qu'un posterior sera scoré.</p>
+<h2>10. Limites</h2>
+<p>Le modèle n'a pas de stade présymptomatique. Il ne lit pas les paramètres secrets de la ville. Les détails sont dans <code>docs/hypotheses.md</code>, recopié dans la documentation longue au moment de <code>make docs</code>.</p>
+<h2>11. Reproductibilité</h2>
+<p><code>make install</code>, puis <code>make all</code>. La graine de rendu est 0. Les commandes <code>epidemic docs</code>, <code>epidemic report</code>, <code>epidemic bulletin --day 21</code> et <code>epidemic slides</code> relisent les YAML. Aucun chiffre de ce rapport n'est saisi dans le gabarit.</p>
+</body>
+</html>
