@@ -1,0 +1,36 @@
+---
+title: "Bulletin du jour {{ day }}"
+lang: fr
+format:
+  pdf:
+    papersize: a4
+    geometry: margin=1.5cm
+---
+
+## Situation en bref
+
+{{ situation }}
+
+## Indicateurs
+
+{{ indicators }}
+
+![Cas confirmés, échelle semi-logarithmique]({{ incidence_figure }})
+
+## Hôpital face à la capacité
+
+![Hospitalisés et soins intensifs confirmés]({{ hospital_figure }})
+
+Plafonds : {{ max_hospitalized }} hospitalisés, {{ max_critical }} soins intensifs.
+
+## Projections
+
+{{ outlook }}
+
+La probabilité estimée par la référence naïve, que les hospitalisés dépassent le plafond dans l'horizon prévu, est {{ probability }} ({{ verbal }}).
+
+## Recommandation
+
+{{ recommendation }}
+
+Palier {{ tier }}. Mesures autorisées : {{ allowed }}.

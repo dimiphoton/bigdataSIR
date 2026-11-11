@@ -1,4 +1,4 @@
-.PHONY: install test lint simulate fit report app play
+.PHONY: install test lint simulate fit play docs slides report app all
 
 install:
 	uv sync --all-groups
@@ -20,8 +20,16 @@ play:
 fit:
 	uv run epidemic fit
 
+docs:
+	uv run epidemic docs
+
+slides:
+	uv run epidemic slides
+
 report:
 	uv run epidemic report
 
 app:
 	uv run streamlit run app/accueil.py
+
+all: lint test docs report slides

@@ -1,0 +1,50 @@
+# Modèle d'inférence. Il ne lit pas les paramètres secrets du simulateur.
+# Variante A : seul β(t) bouge. B : le dépistage bouge aussi, et la surdispersion
+# est estimée. C : bruit normal sur les nouvelles infections (approximation de la
+# chaîne binomiale). Le filtre particulaire n'est pas lancé par défaut.
+
+seed: 0
+age_groups: 2
+variant: A
+beta_mode: weekly_rw
+beta_breakpoints: []
+estimate_specificity: false
+method: nuts
+
+nuts:
+  num_chains: 4
+  num_warmup: 500
+  num_samples: 500
+  target_accept: 0.85
+  chain_method: vectorized
+
+svi:
+  num_steps: 2000
+  learning_rate: 0.002
+  num_samples: 400
+
+diagnostics:
+  max_rhat: 1.01
+  min_ess: 400
+  max_divergences: 0
+  strict: true
+
+# Variante A : dispersion fixée. Plus la concentration est grande, plus on est
+# proche d'une loi de Poisson.
+fixed_concentration: 100.0
+output_dir: data/generated/inference
+course_data: data/external/data.csv
+
+likelihood:
+  cases: negative_binomial
+  hospital: negative_binomial
+
+horizons: [7, 14, 21]
+learning_curve_days: [7, 14, 21, 28, 35, 42, 49, 56, 63, 70]
+
+identifiability:
+  well_below: 0.50
+  partial_below: 0.85
+
+default_days: 40
+save_plots: true

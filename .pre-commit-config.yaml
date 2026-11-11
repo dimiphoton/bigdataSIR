@@ -8,14 +8,13 @@ repos:
       - id: ruff-format
         files: ^(src/epidemic|app|tests)/
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v2.4.1
+  # Même interpréteur que la CI : l'environnement isolé du miroir
+  # mypy ne voit pas numpy, jax ni jinja2.
+  - repo: local
     hooks:
       - id: mypy
+        name: mypy
+        entry: uv run --frozen mypy src/epidemic
+        language: system
+        pass_filenames: false
         files: ^src/epidemic/
-        args: ["--config-file=pyproject.toml"]
-        additional_dependencies:
-          - pydantic>=2
-          - pyyaml>=6
-          - types-pyyaml>=6
-          - typer>=0.12

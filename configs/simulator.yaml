@@ -1,0 +1,74 @@
+# Simulateur « réalité ».
+# Niveau 0 déterministe, 1 démographique, 2 environnementale, 3 hétérogénéité.
+# Une source peut être forcée avec true ou false. null suit le niveau.
+
+population: 1000000
+seed: 0
+stochasticity_level: 1
+day1_date: "2020-10-02"
+observation_source: simulator
+stats_dir: data/external/stats
+course_data: data/external/data.csv
+output_dir: data/generated
+
+sources:
+  demographic: null
+  environmental: null
+  individual_contagion: null
+  individual_compliance: null
+  individual_durations: null
+
+age_bins:
+  - {name: "0-17", low: 0, high: 17}
+  - {name: "18-49", low: 18, high: 49}
+  - {name: "50-59", low: 50, high: 59}
+  - {name: "60-69", low: 60, high: 69}
+  - {name: "70+", low: 70, high: 120}
+
+school_ages: {low: 3, high: 17}
+work_ages: {low: 18, high: 64}
+school_participation: 0.95
+work_participation: 0.70
+
+# Contacts effectifs par jour. Le domicile n'est pas plafonné :
+# il vient directement de la taille des ménages.
+contact_caps:
+  school: 15
+  work: 15
+  community: 4
+
+location_weights:
+  home: 1.0
+  school: 0.45
+  work: 0.45
+  community: 0.25
+
+beta_per_contact: {low: 0.02, high: 0.045}
+initial_exposed: {low: 25, high: 70}
+presymptomatic_days: {low: 1.0, high: 3.0}
+hospital_days: {low: 6.0, high: 12.0}
+icu_days: {low: 7.0, high: 14.0}
+asymptomatic_infectiousness: {low: 0.4, high: 0.8}
+p_test: {low: 0.50, high: 0.85}
+flu_background_daily: {low: 100, high: 500}
+heterogeneity_k: {low: 0.1, high: 0.5}
+
+max_daily_tests: 20000
+duration_shape: 3
+ou_theta: 0.10
+ou_sigma: 0.05
+seasonality_amplitude: 0.0
+p_test_drift_sigma: 0.02
+flu_drift_sigma: 0.05
+sensitivity_daily_sd: 0.02
+compliance_daily_sd: 0.05
+extended_screening_rate: 0.0
+isolate_on_symptoms: false
+
+# Gravité parmi les symptomatiques. Ce ne sont pas des consignes du cours.
+severity:
+  "0-17": {p_hosp: 0.002, p_icu: 0.05, p_death_ward: 0.002, p_death_icu: 0.15}
+  "18-49": {p_hosp: 0.015, p_icu: 0.10, p_death_ward: 0.010, p_death_icu: 0.25}
+  "50-59": {p_hosp: 0.040, p_icu: 0.15, p_death_ward: 0.020, p_death_icu: 0.35}
+  "60-69": {p_hosp: 0.080, p_icu: 0.22, p_death_ward: 0.040, p_death_icu: 0.45}
+  "70+": {p_hosp: 0.180, p_icu: 0.30, p_death_ward: 0.080, p_death_icu: 0.55}

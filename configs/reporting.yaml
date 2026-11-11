@@ -1,0 +1,64 @@
+# Rendu du rapport, de la documentation et des bulletins.
+# Les plafonds d'hôpitaux restent dans configs/thresholds.yaml.
+# L'alpha de la décision reste dans configs/decision.yaml.
+
+seed: 0
+docs_dir: docs
+figures_dir: docs/generated/figures
+bulletin_dir: reports/bulletin
+report_dir: reports
+
+# Tableau de calibration : 7, 14 et 28 jours.
+score_horizons: [7, 14, 28]
+interval_masses: [0.5, 0.9]
+reliability_bins: 5
+ensemble_size: 200
+residual_window: 14
+min_history_days: 14
+
+# Échelle verbale du GIEC, du palier le plus haut au plus bas. minimum est inclus.
+verbal_scale:
+  - minimum: 0.99
+    label: quasi certain
+  - minimum: 0.90
+    label: très probable
+  - minimum: 0.66
+    label: probable
+  - minimum: 0.33
+    label: aussi probable qu'improbable
+  - minimum: 0.10
+    label: improbable
+  - minimum: 0.01
+    label: très improbable
+  - minimum: 0.0
+    label: exceptionnellement improbable
+
+bulletin_horizons: [14, 28]
+prior_draws: 12
+prior_days: 60
+figure_dpi: 120
+
+series:
+  - num_positive
+  - num_hospitalised
+  - num_critical
+  - death_increments
+
+series_labels:
+  num_positive: cas confirmés
+  num_hospitalised: hospitalisés
+  num_critical: soins intensifs
+  death_increments: nouveaux décès
+
+# Écart toléré entre couverture empirique et couverture nominale.
+coverage_tolerance: 0.05
+
+# Trajectoires publiques du simulateur, une par niveau, pour la ventilation.
+score_levels: [0, 1, 2, 3]
+score_level_days: 42
+
+# Une variation d'au moins ce facteur, d'une semaine à l'autre, est une tendance.
+trend_ratio: 1.10
+
+# Horizon des événements P(H > plafond) utilisés pour Brier et le diagramme de fiabilité.
+event_horizon: 28

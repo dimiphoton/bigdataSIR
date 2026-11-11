@@ -1,0 +1,76 @@
+# Calendrier du jeu. Le jour 1 est la date day1_date du simulateur (2 octobre 2020).
+# Le jour 122 est le 31 janvier 2021.
+
+bulletin_period_days: 7
+end_day: 122
+implementation_delay_days: 3
+final_decision_day: 70
+final_implementation_day: 75
+min_policy_days: 14
+stats_public_day: 60
+
+# Chaque palier liste toutes les interventions autorisées, pas seulement les nouvelles.
+tiers:
+  - level: 0
+    from_day: 1
+    interventions: []
+  - level: 1
+    from_day: 21
+    interventions: [mask, case_isolation]
+  - level: 2
+    from_day: 42
+    interventions:
+      - mask
+      - case_isolation
+      - household_quarantine
+      - social_distancing
+  - level: 3
+    from_day: 63
+    interventions:
+      - mask
+      - case_isolation
+      - household_quarantine
+      - social_distancing
+      - lockdown
+
+# Déblocage avant la date si le modèle bayésien (phase suivante) fournit la probabilité.
+early_tier2:
+  earliest_day: 21
+  hospital_threshold: 750
+  horizon_days: 28
+  probability: 0.20
+
+early_tier3:
+  earliest_day: 21
+  horizon_days: 21
+  probability: 0.20
+
+# Coût d'un jour avec la mesure. Les coûts s'additionnent.
+constraint_costs:
+  mask: 1
+  case_isolation: 2
+  social_distancing: 3
+  household_quarantine: 4
+  lockdown: 8
+
+reveals:
+  - day: 4
+    title: Population et tests
+    body: >
+      La ville compte 1 000 000 d'habitants. Une personne peut être
+      infectée et contagieuse sans symptômes. La sensibilité des tests
+      est située entre 70 et 90 %.
+  - day: 25
+    title: Dépistage et durées
+    body: >
+      Au moins 50 % des symptomatiques sont testés. La spécificité
+      annoncée est de 100 %. La sensibilité est précisée : 70 à 85 %.
+      L'incubation dure de 1 à 5 jours, et la période symptomatique
+      avant une hospitalisation dure de 4 à 10 jours. Toute
+      hospitalisation entraîne un test positif.
+  - day: 60
+    title: Structure de la ville
+    body: >
+      Les statistiques d'âge, de ménages, d'écoles, de lieux de travail
+      et de communautés sont publiées. Entre 50 et 70 % des personnes
+      infectées développent des symptômes.
