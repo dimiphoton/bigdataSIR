@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^(src/epidemic|app|tests)/
+      - id: ruff-format
+        files: ^(src/epidemic|app|tests)/
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.4.1
+    hooks:
+      - id: mypy
+        files: ^src/epidemic/
+        args: ["--config-file=pyproject.toml"]
+        additional_dependencies:
+          - pydantic>=2
+          - pyyaml>=6
+          - types-pyyaml>=6
+          - typer>=0.12
