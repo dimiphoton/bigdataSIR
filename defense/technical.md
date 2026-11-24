@@ -13,6 +13,7 @@ style: |
   table { font-size: 18px; margin: 0 auto; }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: center; }
   .formula { font-size: 22px; background: #f4f7fb; padding: 8px 14px; border-left: 4px solid #12355b; margin: 8px 0; }
+  .katex-display { margin: 0.28em 0; }
   pre { font-size: 15px; line-height: 1.25; background: #f4f7fb; padding: 12px 16px; }
   section.part { background: #12355b; color: #fff; }
   section.part h1 { color: #fff; font-size: 42px; margin-top: 220px; }
@@ -27,7 +28,7 @@ PROJ0016 · ULiège 2020 · 71 public days · NumPyro NUTS
 <span class="small">Dimitri Marchand · https://github.com/dimiphoton/bigdataSIR</span>
 
 <!--
-Le fil est une décision, pas une méthode. Une ville d'un million d'habitants, des comptages publiés, et un seuil d'hôpitaux à ne pas dépasser. Tout le reste sert à construire la probabilité de ce seuil.
+The thread is a decision, not a method. One million people, published counts, and a hospital line that must not be crossed. Everything else is there to build the probability of crossing it.
 -->
 
 ---
@@ -47,7 +48,42 @@ Le fil est une décision, pas une méthode. Une ville d'un million d'habitants, 
 | Decision threshold | Probability of an event | Keep a measure only if P(saturation) ≤ 5% |
 
 <!--
-Lire le tableau de haut en bas, une ligne. L'idée à laisser : on ne rend pas une meilleure valeur, on rend toutes les valeurs encore compatibles avec les consignes et avec les 71 jours.
+Read the table top to bottom, one row at a time. The point to leave behind: the result is not a best value. It is every value still compatible with the brief and with the 71 days.
+-->
+
+---
+
+# IISc Bangalore and TIFR built a city of agents, not a compartment average
+
+| | `cni-iisc/epidemic-simulator`, 2020 |
+|---|---|
+| Who | Indian Institute of Science, Bangalore, and TIFR Mumbai. Apache-2.0 |
+| City | `CityGen.py` gives every person a home, a school, a workplace and a community centre, from age and commute distance |
+| Example | A synthetic Mumbai. The documented run uses 10,000 agents. The C++ note cites 100,000 |
+| Engines | A browser simulator, then C++ `drive_simulator` |
+| Levers | 11 coded policies: none, case isolation, home quarantine, lockdown, and distancing of people over 65 or 70 |
+| Their fit | `tune_model_CPP.py` tunes $\beta$ to a fatalities series |
+
+<span class="small">Source: the repository README. This project does not run that code.</span>
+
+<!--
+This is the original Indian simulator, not our file. Two institutes built a synthetic city so they could try non-pharmaceutical interventions under Indian demographics. Each agent has a home, a school, a workplace and a community centre. They later rewrote the browser engine in C++. Their own calibration is a single beta tuned to deaths, which is the habit the next part of the talk leaves behind.
+-->
+
+---
+
+# This project keeps the four places and the levers, and drops the agents
+
+| | IISc simulator | This project |
+|---|---|---|
+| People | Agents in a generated Indian city | One fictional city of 1,000,000. No ward map |
+| Contacts | Home, school, workplace, community, visited each day | The same four places, summed into one matrix |
+| Policies | The 11 codes above | Those names, plus a mask. 112 packages |
+| What is hidden | The agent state | $\beta$, durations, severity, testing rate |
+| Estimation | One $\beta$ tuned to deaths | A posterior. The fit never reads their code |
+
+<!--
+Draw the line. We kept the geography of contact and the names of the measures. We did not keep the agents, the ward map, or their tuner. The rows in data.csv are a course reduction of that design. The inference model is smaller again: two age groups, no separate places, no presymptomatic stage.
 -->
 
 ---
@@ -64,7 +100,7 @@ Lire le tableau de haut en bas, une ligne. L'idée à laisser : on ne rend pas u
 <span class="small">Day 71 in `data/external/data.csv`: 2,035 confirmed, 2,539 tests, 774 in ward, 76 in ICU.</span>
 
 <!--
-Insister sur la séparation. Le simulateur a déjà tiré ses paramètres. L'ajustement n'a pas le droit de les regarder. Le modèle qu'on ajuste est plus petit que la ville : deux âges, pas de présymptomatique.
+Stress the separation from the IISc binary as well as from our own simulator. The parameters have already been drawn. The fit is not allowed to read them. The model being fitted is smaller than the city: two age groups, and no presymptomatic stage.
 -->
 
 ---
@@ -78,7 +114,7 @@ Insister sur la séparation. Le simulateur a déjà tiré ses paramètres. L'aju
 - The limits to hold until 31 January: ward **< 1,500**, ICU **< 300**
 
 <!--
-Trois faits, pas une méthode. On ne voit pas les infectés. Le doublement est encore rapide. Les deux plafonds sont ceux des consignes, pas des miens.
+Three facts, not a method. Infections are not observed. Doubling is still fast. Both ceilings come from the brief, not from me.
 -->
 
 ---
@@ -92,7 +128,7 @@ Trois faits, pas une méthode. On ne voit pas les infectés. Le doublement est e
 5. **Decision** — cheapest measure whose P(saturation) is ≤ 5%
 
 <!--
-C'est le plan du reste de l'exposé. Ne pas développer. Dire que les étapes 4 et 5 sont le produit ; les étapes 1 à 3 servent à ne pas leur donner un chiffre trop sûr.
+This is the plan for the rest of the talk. Do not expand it. Steps 4 and 5 are the product. Steps 1 to 3 exist so that product is not a number that is too sure of itself.
 -->
 
 ---
@@ -104,25 +140,39 @@ C'est le plan du reste de l'exposé. Ne pas développer. Dire que les étapes 4 
 <span class="small">Posterior medians on the arrows: incubation 6.5 days, 61% symptomatic, hospital risk 5% under 60 and 20% over 60.</span>
 
 <!--
-Montrer le schéma une fois. La boucle en pointillé est la transmission. La couche du bas est le test : elle ne change pas qui est infecté, elle change ce qu'on publie. Les pourcentages sont des médianes a posteriori, pas les paramètres cachés.
+Walk the diagram once. The dashed loop is transmission. The bottom layer is testing: it does not change who is infected, it changes what is published. The percentages are posterior medians, not the hidden parameters.
 -->
 
 ---
 
-# One day is three equations: infection, exit, and what gets published
+# One day: who gets infected, who leaves, and what is published
 
-$$\lambda_g(t)=\beta(t)\sum_j C_{gj}\,(\kappa I_{a,j}+I_{s,j})/N_j$$
+$$
+\begin{aligned}
+\lambda_g(t)
+  &= \beta(t)\sum_j C_{gj}\,\frac{\kappa I_{a,j}(t)+I_{s,j}(t)}{N_j}\\[6pt]
+n_g(t)
+  &= S_g(t)\bigl(1-e^{-\lambda_g(t)}\bigr)\\[6pt]
+\pi(d)
+  &= 1-e^{-1/d}
+\end{aligned}
+$$
 
-$$n_{\mathrm{new}}=S\,(1-e^{-\lambda})\qquad P(\mathrm{leave})=1-e^{-1/d}$$
+$$
+\begin{aligned}
+\mathbb{E}\!\left[Y^{+}(t)\right]
+  &= \eta\, p_{\mathrm{test}}\, C^{\mathrm{sym}}(t)+A(t)\\[6pt]
+H^{\mathrm{in}}_g(t)
+  &= p_{\mathrm{hosp},g}\,\pi(d_I)\, I^{s}_g(t)\\[6pt]
+U^{\mathrm{in}}_g(t)
+  &= p_{\mathrm{icu},g}\,\pi(d_H)\, H_g(t)
+\end{aligned}
+$$
 
-$$\mathbb{E}[Y^{+}]=\mathrm{sens}\cdot p_{\mathrm{test}}\cdot C_{\mathrm{sym}}+A$$
-
-$A$ = admissions not already confirmed. Specificity is fixed at 100%.
-
-$$\text{ward entry}=(\text{symptomatic exits})\times p_{\mathrm{hosp}}\qquad \text{ICU entry}=(\text{ward exits})\times p_{\mathrm{icu}}$$
+<span class="small">$\eta$ sensitivity. $A(t)$ admissions not already confirmed. Specificity fixed at 1.</span>
 
 <!--
-Lire les trois blocs dans l'ordre. D'abord qui s'infecte, ensuite qui quitte sa case, ensuite ce qui est écrit dans le fichier. Le dernier bloc est le seul lien entre les infectieux et les lits.
+Read the two blocks in order. The first is who gets infected and who leaves a box. The second is what is written to the file, then the only link from infectious people to beds. Pi of d is the chance of leaving a stage whose mean length is d days.
 -->
 
 ---
@@ -134,14 +184,19 @@ Lire les trois blocs dans l'ordre. D'abord qui s'infecte, ensuite qui quitte sa 
 <span class="small">Posterior medians: 388 never symptomatic, 144 symptomatic but untested, 88 false negatives, 379 confirmed.</span>
 
 <!--
-Le test ne regarde que les symptomatiques, et pas tous. Avec les médianes, 379 des 1 000 infections du jour sont confirmées. Ce n'est pas encore le rapport 3,9 de la fin : un cas publié aujourd'hui a été infecté plus tôt, pendant une phase qui double encore.
+Testing looks only at symptomatic people, and not at all of them. At the posterior medians, 379 of 1,000 same-day infections are confirmed. That is not yet the factor of 3.9 at the end: a case published today was infected earlier, while incidence was still doubling.
 -->
 
 ---
 
 # $\beta$ is the transmission rate; $R_0$ is the offspring count while everyone is susceptible
 
-$$\lambda = \beta \times (\text{infectious pressure}) \qquad R_0 = \beta \times d_I \qquad R_e(t) = R_0 \times S(t)/N$$
+$$
+\begin{aligned}
+R_0 &= \beta\, d_I \\[4pt]
+R_e(t) &= R_0\, \frac{S(t)}{N}
+\end{aligned}
+$$
 
 | | In the one-group step on the next slide |
 |---|---|
@@ -153,7 +208,7 @@ $$\lambda = \beta \times (\text{infectious pressure}) \qquad R_0 = \beta \times 
 <span class="small">Fitted $\beta_0$ is 0.11 (0.07–0.15). It multiplies the contact matrix, so it is not 0.41.</span>
 
 <!--
-β est le débit de contamination. R0 est le nombre de personnes infectées par un cas tant que tout le monde est encore susceptible. Re est le même nombre une fois qu'une partie de la ville est déjà immunisée : on le multiplie par la part encore susceptible. Au-dessus de 1, ça croît. En dessous, les nouveaux infectés baissent. Le 0,41 de cette diapositive n'est pas le β0 ajusté : celui-là vaut 0,11 parce qu'il est ensuite multiplié par les contacts.
+Beta is the rate of transmission. R0 is how many people one case infects while everyone is still susceptible. Re is that number once part of the city is immune: multiply by the share still susceptible. Above 1, incidence grows. Below 1, it falls. The 0.41 on this slide is not the fitted beta0. That one is 0.11, because it is then multiplied by the contact matrix.
 -->
 
 ---
@@ -165,7 +220,7 @@ $$\lambda = \beta \times (\text{infectious pressure}) \qquad R_0 = \beta \times 
 Day 71: $S=95\%$, so $R_e \approx 1.89$. Peak day **107**. This step infects **84%**. No measure.
 
 <!--
-Le message pour la décision : au jour 71 l'épuisement des susceptibles n'a pas commencé, Re vaut encore environ 1,9. L'épidémie s'arrête seule plus tard, autour du jour 107, après avoir touché 84 % de la ville dans ce pas simplifié. La formule classique de taille finale, pour un R0 de 1,99, donne plutôt 79 %. Attendre cet arrêt, c'est laisser passer le pic d'hôpitaux.
+The decision point: on day 71 the susceptible stock has barely moved, and Re is still about 1.9. The epidemic burns out later, around day 107, after this simplified step has infected 84% of the city. The classic final-size formula, at R0 of 1.99, gives about 79%. Waiting for that burnout means missing the hospital peak.
 -->
 
 ---
@@ -183,7 +238,7 @@ Le message pour la décision : au jour 71 l'épuisement des susceptibles n'a pas
 <span class="small">One-group new infections, not ward beds. The factors are those of the 112 packages.</span>
 
 <!--
-À gauche, baisser β dès le jour 1 décale et rabaisse le pic : c'est aplatir la courbe. Le masque du projet multiplie β par 0,82. Le confinement le multiplie par 0,52, et R0 tombe à 1,03 : la vague ne démarre pas. À droite, la même baisse au jour 71 arrive quand la croissance est déjà lancée. Ce graphe compte des infections, pas des lits. Le décalage vers l'hôpital reste celui du modèle complet.
+On the left, lowering beta from day 1 moves the peak down and later: that is flattening the curve. The project's mask multiplies beta by 0.82. Lockdown multiplies it by 0.52, and R0 falls to 1.03, so the wave does not take off. On the right, the same cut on day 71 arrives after growth is already under way. This figure counts infections, not beds. The lag into hospital is the one in the full model.
 -->
 
 ---
@@ -202,7 +257,11 @@ Le message pour la décision : au jour 71 l'épuisement des susceptibles n'a pas
 | Tests on people who are not infected | Log-normal, median **300 / day** | Assumption |
 
 <!--
-La dernière ligne est une hypothèse à moi, pas une consigne. Elle va être contredite. Les durées d'hôpital et la gravité par âge non plus ne sont pas dans les consignes : le posterior ne pourra pas les « retrouver » s'il n'a pas de quoi les séparer.
+A prior is what we accept before the 71 days are seen. A duration is log-normal, so it stays positive and its central 90 percent matches an interval. A proportion is a Beta.
+
+Read the table in two blocks. The first five rows are the brief. Incubation sits between 1 and 5 days. The symptomatic spell before hospital sits between 4 and 10. About 60 percent of infections become symptomatic. Test sensitivity sits around 78 percent, between 70 and 85. The testing rate has a floor at 50 percent, and above that floor the prior is almost flat.
+
+The last three rows are not in the brief. They are marked as assumptions. Hospital and ICU stays are centred at 8 and 10 days. Severity is higher in the older group. Remember the last row: I put a median of 300 tests a day on people who are not infected. Nothing in the brief says that. The data will throw it out.
 -->
 
 ---
@@ -211,12 +270,12 @@ La dernière ligne est une hypothèse à moi, pas une consigne. Elle va être co
 
 ![w:1080](figures/bayes_update.png)
 
-$$p(\theta \mid \mathrm{data}) \propto p(\mathrm{data} \mid \theta)\, p(\theta)$$
+$$p(\theta \mid y) \propto p(y \mid \theta)\, p(\theta)$$
 
 <span class="small">Toy update of sensitivity from positivity alone. The full model, which also allows tests on uninfected people, gives 0.81 (0.79–0.84).</span>
 
 <!--
-Le graphe est un seul paramètre, pour voir le produit prior fois vraisemblance. Après 7 jours le prior pèse encore. Après 71 jours le jouet est presque une pointe. Dans le modèle complet l'intervalle reste 0,79–0,84, parce que d'autres paramètres peuvent expliquer les mêmes positifs.
+The figure is one parameter, so the product of prior and likelihood is visible. After 7 days the prior still weighs. After 71 days the toy is almost a spike. In the full model the interval stays 0.79 to 0.84, because other parameters can explain the same positives.
 -->
 
 ---
@@ -226,15 +285,15 @@ Le graphe est un seul paramètre, pour voir le produit prior fois vraisemblance.
 | Source | What is unknown | How it enters |
 |---|---|---|
 | Parameters | $\beta$, durations, risks | Width of the posterior; shrinks with data |
-| Process | Who gets infected today is a draw | $1-e^{-1/d}$ each day, and a weekly step on $\beta(t)$ |
+| Process | Who gets infected today is a draw | $\pi(d)=1-e^{-1/d}$ each day, and a weekly step on $\beta(t)$ |
 | Observation | Tests miss people | Testing layer, then a negative binomial |
 
-$$p(\mathrm{future}\mid\mathrm{data})=\int p(\mathrm{future}\mid\theta)\,p(\theta\mid\mathrm{data})\,d\theta$$
+$$p(\tilde{y}\mid y)=\int p(\tilde{y}\mid\theta)\,p(\theta\mid y)\,\mathrm{d}\theta$$
 
 About 2,000 posterior draws, each simulated with noise.
 
 <!--
-Si on ne garde que la médiane des paramètres, on oublie les deux dernières lignes et on sous-estime le risque. La probabilité de saturation plus loin est exactement cette intégrale, comptée comme une part de courbes.
+Keeping only the median of the parameters drops the last two rows and understates the risk. The saturation probability later in the talk is this integral, counted as a share of curves.
 -->
 
 ---
@@ -259,7 +318,7 @@ mcmc.run(key, **kwargs)
 <span class="small">`src/epidemic/inference/fit.py`. Kept run: 4 chains, 1,000 warmup steps, 500 draws each, target accept 0.9.</span>
 
 <!--
-Montrer que le code ne cherche pas un minimum. Il lance quatre marches qui doivent se retrouver. init_to_median est là parce qu'un départ au hasard coinçait les chaînes. Les réglages du run conservé sont sous le code, pas dans les valeurs par défaut du YAML.
+Show that the code is not searching for a minimum. It starts four walks that have to meet. init_to_median is there because a random start stuck the chains. The settings of the kept run are under the code, not the YAML defaults.
 -->
 
 ---
@@ -278,7 +337,7 @@ Montrer que le code ne cherche pas un minimum. Il lance quatre marches qui doive
 <span class="small">Own gates were $\hat R < 1.01$ and ESS ≥ 400. This run misses both, on the hospital duration.</span>
 
 <!--
-À gauche, une chaîne plate n'explore pas : ce n'était pas deux modes, c'était un pas trop petit après un mauvais départ. À droite, les chaînes se recouvrent. On s'arrête quand même avant de croire l'intervalle de la durée d'hôpital : R-hat 1,02 et ESS 387, sous les seuils que je m'étais fixés.
+On the left, a flat chain is not exploring. That was not two modes. The step had collapsed after a bad start. On the right, the chains overlap. Still do not trust the hospital-stay interval: R-hat 1.02 and ESS 387, short of the gates I had set.
 -->
 
 ---
@@ -292,7 +351,7 @@ Montrer que le code ne cherche pas un minimum. Il lance quatre marches qui doive
 Only sensitivity (×0.43) and tests on uninfected people (×0.36) pass that bar.
 
 <!--
-Apprendre à lire un panneau avant les conclusions. Si le bleu recouvre le gris, les données n'ont rien ajouté. Si le bleu est ailleurs et plus étroit, elles ont appris. Ici, deux panneaux seulement sont vraiment resserrés.
+Teach the panel before the conclusions. If blue covers gray, the data added nothing. If blue has moved and narrowed, they learned something. Here only two panels are actually tight.
 -->
 
 ---
@@ -306,7 +365,7 @@ Apprendre à lire un panneau avant les conclusions. Si le bleu recouvre le gris,
 Cases, tests and ward sit in the band. ICU is a bit high at the end: it is the smallest series.
 
 <!--
-Ceci vérifie la vraisemblance, pas les paramètres. Un modèle peut reproduire l'hôpital avec de mauvaises durées, si le risque d'hospitalisation compense. C'est le sujet des diapositives suivantes.
+This checks the likelihood, not the parameters. A model can reproduce the ward with the wrong durations, if the hospitalisation risk compensates. That is the next few slides.
 -->
 
 ---
@@ -322,7 +381,7 @@ Ceci vérifie la vraisemblance, pas les paramètres. Un modèle peut reproduire 
 | Share tested | 0.76 (0.58–0.93) | ×0.99 | Still the prior |
 
 <!--
-Deux résultats nets. La sensibilité est apprise. Le fond de 300 tests par jour sur des non-infectés était mon hypothèse, et elle est fausse : le posterior est à 5 par jour. Les deux dernières lignes n'ont pas bougé : on y revient.
+Two clean results. Sensitivity is learned. The background of 300 tests a day on uninfected people was my assumption, and it is wrong: the posterior is about 5 a day. The last two rows did not move. We come back to them.
 -->
 
 ---
@@ -339,7 +398,7 @@ Deux résultats nets. La sensibilité est apprise. Le fond de 300 tests par jour
 The inference model has no presymptomatic box. The simulator gives that stage 1–3 days. The 6.5 days absorb a delay the model does not have.
 
 <!--
-Ne pas présenter 6,5 comme une incubation retrouvée. L'intervalle est plus large que le prior et sort des consignes. C'est le signe qu'il manque une case, pas une découverte sur le virus.
+Do not present 6.5 as a recovered incubation. The interval is wider than the prior and leaves the brief. It is a sign that a box is missing, not a finding about the virus.
 -->
 
 ---
@@ -357,14 +416,20 @@ Ne pas présenter 6,5 comme une incubation retrouvée. L'intervalle est plus lar
 | Death in ICU | 13% (1–24) / 34% (8–60) | Centred near 25% |
 
 <!--
-La seule ligne qui s'écarte clairement est le risque d'hospitalisation, surtout après 60 ans, et son intervalle reste large. Les durées de séjour et les décès recouvrent encore leur prior. On ne les cite pas comme des paramètres retrouvés.
+The only row that clearly moves is the hospitalisation risk, especially over 60, and its interval stays wide. Lengths of stay and death risks still cover their priors. Do not quote them as recovered parameters.
 -->
 
 ---
 
 # Testing rate and symptomatic fraction stay interchangeable
 
-$$\mathbb{E}[Y^{+}] \propto p_{\mathrm{test}}\times(\text{symptomatic fraction})\times(\text{new infections})$$
+$$
+\mathbb{E}\!\left[Y^{+}\right]
+\propto
+p_{\mathrm{test}}\, f_{\mathrm{sym}}\, \iota
+$$
+
+<span class="small">$f_{\mathrm{sym}}$ symptomatic fraction. $\iota$ new infections.</span>
 
 | | Posterior 90% | Width ratio |
 |---|---|---|
@@ -374,7 +439,7 @@ $$\mathbb{E}[Y^{+}] \propto p_{\mathrm{test}}\times(\text{symptomatic fraction})
 Several pairs print the same confirmed cases. The ward series does not separate them either, once $p_{\mathrm{hosp}}$ can move.
 
 <!--
-Montrer le produit. Si je double le taux de test et que je baisse la fraction symptomatique, les positifs ne changent pas. C'est pour ça que ces deux lois sont restées sur le prior. Il faudrait une autre mesure, par exemple une sérologie, pour les séparer.
+Show the product. Double the testing rate and lower the symptomatic fraction, and the positives do not change. That is why both posteriors stayed on the prior. Separating them needs another series, for example serology.
 -->
 
 ---
@@ -388,7 +453,7 @@ Montrer le produit. Si je double le taux de test et que je baisse la fraction sy
 <span class="small">90% interval 2.9–5.4. The width is the unidentified testing rate from the previous slide.</span>
 
 <!--
-C'est la quantité utile que le modèle sort quand même : l'épidémie cachée, avec un intervalle. Ne pas la présenter comme précise. Elle bouge dès que le taux de dépistage bouge, et ce taux n'est pas identifié.
+This is the useful quantity the model still produces: the hidden epidemic, with an interval. Do not present it as precise. It moves as soon as the testing rate moves, and that rate is not identified.
 -->
 
 ---
@@ -397,19 +462,29 @@ C'est la quantité utile que le modèle sort quand même : l'épidémie cachée,
 
 ![w:900](figures/futures.png)
 
-$$P(\mathrm{sat})=\frac{1}{M}\sum_{m=1}^{M}\mathbf{1}\{\mathrm{ward}_m>1500\ \mathrm{or}\ \mathrm{ICU}_m>300\}$$
+$$
+P(\mathrm{sat})
+=\frac{1}{M}\sum_{m=1}^{M}
+\mathbf{1}\!\left\{\max_t H^{(m)}_t>1500
+\;\mathrm{or}\;
+\max_t U^{(m)}_t>300\right\}
+$$
 
 <span class="small">$M = 2000$ posterior trajectories. Red curves cross 1,500 ward beds.</span>
 
 <!--
-Lire la formule comme un comptage. Pas de seuil magique sur une courbe moyenne : on compte les courbes qui dépassent. Le graphe montre lesquelles, et quand. L'inertie met presque tout le franchissement entre les jours 78 et 90.
+Read the formula as a count. There is no cutoff on an average curve: count the curves that cross. The figure shows which ones, and when. Inertia puts almost every crossing between days 78 and 90.
 -->
 
 ---
 
 # The alert score is P(saturation); a measure is kept only if it falls to 5% or below
 
-$$a^{\star}=\arg\min_a \mathrm{cost}(a)\quad\text{subject to}\quad P(\mathrm{sat}\mid a)\le 0.05$$
+$$
+a^{\star}
+=\operatorname*{arg\,min}_{a:\,P(\mathrm{sat}\mid a)\,\le\,0.05}
+\operatorname{cost}(a)
+$$
 
 | Action from day 71 | Cost | P(saturation) | Median peak ward |
 |---|---|---|---|
@@ -420,7 +495,7 @@ $$a^{\star}=\arg\min_a \mathrm{cost}(a)\quad\text{subject to}\quad P(\mathrm{sat
 No row is ≤ 0.05. The alert stays on. The cheapest package that was scored still leaves a 53% chance of crossing a limit.
 
 <!--
-La règle est posée avant de voir le tableau : on ne retient une mesure que si la probabilité passe sous 5 %, et parmi celles-là on prend la moins coûteuse. Ici l'ensemble est vide. Le meilleur rapport du tableau est 53 %, pas 5 %.
+State the rule before the table. Keep a measure only if its probability falls to 5% or below, and among those pick the cheapest. Here that set is empty. The best row in the table is 53%, not 5%.
 -->
 
 ---
@@ -434,7 +509,7 @@ La règle est posée avant de voir le tableau : on ne retient une mesure que si 
 The lowest score is **41%** (mask, 14-day household quarantine, and lockdown). Adding distancing does not go lower.
 
 <!--
-Le graphe est le même calcul que le tableau, pour les 112 paquets. Montrer que le nuage ne touche pas 5 %. La raison est l'inertie : les lits des deux prochaines semaines sont déjà des infections en cours au jour 71.
+The figure is the same calculation as the table, for all 112 packages. Show that the cloud never touches 5%. The reason is inertia: beds over the next two weeks are infections already under way on day 71.
 -->
 
 ---
@@ -451,7 +526,7 @@ Le graphe est le même calcul que le tableau, pour les 112 paquets. Montrer que 
 The seven curves stay inside the band. One of them, Virus_buster, does cross 300 ICU beds.
 
 <!--
-Ceci compare des trajectoires d'hôpitaux, pas des paramètres. Le simulateur du cours est plus détaillé que le modèle. Le pic médian tombe au milieu des sept courbes publiées. L'intervalle, lui, va de 1 000 à 2 000 : la prévision contenait le pic, elle ne l'a pas serré.
+This compares hospital trajectories, not parameters. The course simulator is more detailed than the model. The median peak lands among the seven published curves. The interval runs from about 1,000 to 2,000: the forecast contained the peak, it did not pin it down.
 -->
 
 ---
@@ -465,7 +540,7 @@ Ceci compare des trajectoires d'hôpitaux, pas des paramètres. Le simulateur du
 | Parameters | Posterior margins in `defense/summary_key.csv` | A recovery check against known parameters |
 
 <!--
-Trois manques, sans les habiller. Les chaînes sont utilisables pour l'hôpital et pas assez propres pour la durée de séjour. Les 31 % sont les références naïves, pas ce modèle. Personne n'a revérifié les paramètres sur une ville dont on connaît les vrais chiffres.
+Three gaps, stated plainly. The chains are usable for the ward forecast and not clean enough for the length of stay. The 31% is the naive baselines, not this model. Nobody has checked the parameters on a city whose true values are known.
 -->
 
 ---
@@ -477,7 +552,7 @@ Trois manques, sans les habiller. Les chaînes sont utilisables pour l'hôpital 
 - **Score the model the way the baselines were scored.** Refit at each week, then CRPS at 7, 14 and 21 days.
 
 <!--
-Chaque puce est le défaut de la diapositive correspondante : incubation, confusion dépistage-symptômes, absence de backtest. Ne pas en ajouter une quatrième.
+Each bullet is the defect from the matching slide: incubation, the testing-rate confusion, and the missing backtest. Do not add a fourth.
 -->
 
 ---
@@ -491,5 +566,5 @@ Chaque puce est le défaut de la diapositive correspondante : incubation, confus
 <span class="small">NumPyro · JAX · ArviZ · 4 chains · 71 days · 2 age groups</span>
 
 <!--
-Fermer sur les trois faits qu'un ajustement par moindres carrés n'aurait pas rendus de la même façon : un départ de chaîne cassé, un prior chiffré qui était faux, et une probabilité de saturation plutôt qu'un pic unique. Le pic d'hôpitaux, lui, est tombé au bon endroit, dans un intervalle large.
+Close on three facts a least-squares fit would not have returned in the same way: a broken chain start, a numerical prior that was wrong, and a saturation probability rather than a single peak. The hospital peak did land in the right place, inside a wide interval.
 -->
