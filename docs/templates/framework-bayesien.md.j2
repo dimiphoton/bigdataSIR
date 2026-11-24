@@ -152,6 +152,8 @@ Une intervention devient un facteur sur \(\beta\), calculé depuis les matrices 
 
 Les projections affichées dans un bulletin couvrent {{ bulletin_horizons }} jours. Les éventails du modèle (médiane, 50 %, 90 %) portent sur les hospitalisés, les soins intensifs, les décès, les cas confirmés et Rt.
 
+Le graphe nouvelles infections contre le réservoir infectieux porte en abscisse le réservoir infectieux estimé \(I(t)\) et en ordonnée les nouvelles infections estimées par jour, tous deux en échelle logarithmique, avec la médiane a posteriori et les bandes à 50 % et 90 %. En phase exponentielle, \(\mathrm{d}I/I = \beta S/N\) : sur ce graphe, c'est une droite de pente 1 tracée à travers le début de la vague. Un marqueur indique chaque date de début d'intervention. Le second panneau montre \(\mathrm{d}I/I\) au cours du temps, toujours en échelle logarithmique. Quand la trajectoire passe sous la droite, chaque personne infectieuse en génère moins, soit parce que la part de susceptibles \(S/N\) baisse, soit parce qu'une intervention a réduit \(\beta\).
+
 ## 10. Calibration
 
 **Intuition.** Annoncer 90 % ne vaut rien si la réalité ne tombe dans l'intervalle que six fois sur dix. On compare donc les probabilités annoncées aux fréquences observées, après coup.

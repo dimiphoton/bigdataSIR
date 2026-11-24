@@ -366,6 +366,35 @@ class LatentSegment:
     beta: np.ndarray
 
 
+def as_latent_segment(projection: Projection) -> LatentSegment:
+    """Reprend les séries latentes déjà portées par une projection.
+
+    ``new_infections`` et ``infectious`` sont copiées. Les flux que la
+    projection ne garde pas (symptomatiques, admissions, décès latents, β nu)
+    restent à zéro.
+    """
+    new_infections = np.asarray(projection.new_infections, dtype=float).copy()
+    infectious = np.asarray(projection.infectious, dtype=float).copy()
+    blank = np.zeros_like(new_infections)
+
+    def copy(array: np.ndarray) -> np.ndarray:
+        return np.asarray(array, dtype=float).copy()
+
+    return LatentSegment(
+        new_infections=new_infections,
+        new_symptomatic=blank.copy(),
+        new_hospital=blank.copy(),
+        new_deaths=blank.copy(),
+        hospitalized=copy(projection.hospitalized),
+        critical=copy(projection.critical),
+        susceptible=copy(projection.susceptible),
+        infectious=infectious,
+        rt=copy(projection.rt),
+        beta_effective=copy(projection.beta_effective),
+        beta=blank.copy(),
+    )
+
+
 def step_one_day(
     state: np.ndarray,
     beta: np.ndarray,

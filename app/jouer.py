@@ -20,6 +20,7 @@ from epidemic.viz.tracking import (
     plot_incidence,
     plot_loglog,
     plot_pareto,
+    plot_reservoir,
     plot_rt,
     plot_scenario_fans,
     plot_underreporting,
@@ -274,7 +275,7 @@ def _show_calibration(game: Game, advice) -> None:
 
 
 def _show_figures(game: Game, advice, path: Path) -> None:
-    """Les huit graphes de suivi du bulletin, pour la politique en cours."""
+    """Graphes de suivi du bulletin, pour la politique en cours."""
     frame = game.observations()
     if frame.empty:
         return
@@ -307,6 +308,18 @@ def _show_figures(game: Game, advice, path: Path) -> None:
         start = max(0, index - 6)
         weekly[index] = float(positive[start : index + 1].sum())
     _draw(plot_loglog(np.cumsum(positive), weekly))
+    _draw(
+        plot_reservoir(
+            advice.baseline_latent,
+            intervention_days=_intervention_starts(game),
+        )
+    )
+    st.caption(
+        "En phase exponentielle, les nouvelles infections estimées sont "
+        "proportionnelles au réservoir infectieux : dI/I = β S/N, "
+        "une droite de pente 1 en log-log. "
+        "Le panneau du bas suit ce rapport au cours du temps."
+    )
     _draw(
         plot_rt(
             baseline.fans["rt"],
@@ -364,6 +377,10 @@ def _baseline(advice):
     return next(
         option for option in advice.options if option.key == advice.baseline_key
     )
+
+
+def _intervention_starts(game: Game) -> list[int]:
+    return sorted({int(policy.effect_start) for policy in game.policies})
 
 
 def _spans(game: Game) -> list[tuple[int, int]]:

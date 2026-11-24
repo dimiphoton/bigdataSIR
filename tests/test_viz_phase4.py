@@ -4,8 +4,10 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 
 from epidemic.forecast.bands import fan_from_draws
+from epidemic.forecast.project import LatentSegment
 from epidemic.model.dynamics import N_COMPARTMENTS
 from epidemic.model.priors import prior_catalogue
 from epidemic.viz.dag import prior_table_markdown, render_numpyro_dag
@@ -20,6 +22,7 @@ from epidemic.viz.tracking import (
     log_slope,
     plot_incidence,
     plot_pareto,
+    plot_reservoir,
 )
 
 
@@ -60,3 +63,54 @@ def test_tracking_figures_and_doubling_time() -> None:
     )
     assert pareto.axes
     plt.close(pareto)
+
+
+def _latent(new_infections: np.ndarray, infectious: np.ndarray) -> LatentSegment:
+    blank = np.zeros_like(new_infections)
+    return LatentSegment(
+        new_infections=new_infections,
+        new_symptomatic=blank,
+        new_hospital=blank,
+        new_deaths=blank,
+        hospitalized=blank,
+        critical=blank,
+        susceptible=np.full_like(new_infections, 1_000_000.0),
+        infectious=infectious,
+        rt=np.ones_like(new_infections),
+        beta_effective=np.ones_like(new_infections),
+        beta=np.ones_like(new_infections),
+    )
+
+
+def test_reservoir_plot_follows_the_unit_slope() -> None:
+    """Phase exponentielle : pente 1, puis marqueur le jour où dI/I baisse."""
+    time = np.arange(18, dtype=float)
+    infectious = 15.0 * np.exp(0.08 * time)
+    new_infections = 0.3 * infectious
+    new_infections = new_infections.copy()
+    new_infections[12:] *= 0.4
+    jitter = np.linspace(0.85, 1.15, 4)[:, None]
+    segment = _latent(new_infections * jitter, infectious * jitter)
+    with pytest.raises(ValueError):
+        plot_reservoir(_latent(np.ones((2, 2)), np.ones((2, 2))))
+    figure = plot_reservoir(segment, intervention_days=[13])
+    phase, ratio = figure.axes
+    assert phase.get_xscale() == "log"
+    assert phase.get_yscale() == "log"
+    assert ratio.get_yscale() == "log"
+    slope_line = next(line for line in phase.lines if line.get_label() == "Pente 1")
+    x_line = np.asarray(slope_line.get_xdata(), dtype=float)
+    y_line = np.asarray(slope_line.get_ydata(), dtype=float)
+    slope = np.log(y_line[-1] / y_line[0]) / np.log(x_line[-1] / x_line[0])
+    assert abs(slope - 1.0) < 1e-6
+    assert np.allclose(y_line, 0.3 * x_line)
+    notes = " ".join(text.get_text() for text in phase.texts)
+    assert "S/N" in notes
+    assert "beta" in notes
+    assert "J13" in notes
+    ratio_line = next(line for line in ratio.lines if line.get_label() == "dI/I")
+    ratio_values = np.asarray(ratio_line.get_ydata(), dtype=float)
+    assert np.allclose(ratio_values[:8], 0.3)
+    assert ratio_values[-1] < 0.2
+    assert any(len(collection.get_offsets()) for collection in phase.collections)
+    plt.close(figure)

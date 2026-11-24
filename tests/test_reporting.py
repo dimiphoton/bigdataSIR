@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from epidemic.config import load_reporting_config
 from epidemic.forecast.scoring import (
@@ -14,7 +15,8 @@ from epidemic.forecast.scoring import (
 )
 from epidemic.forecast.verbal import verbal_probability
 from epidemic.reporting.bulletin import write_bulletin
-from epidemic.reporting.render import render_docs
+from epidemic.reporting.render import render_docs, render_named
+from epidemic.reporting.slide_titles import city_phrase, coverage_extent
 from epidemic.series import ObservationSeries
 
 
@@ -79,9 +81,74 @@ def test_bulletin_states_confirmed_and_estimated(tmp_path: Path) -> None:
     )
     assert "confirmé" in text
     assert "estimé" in text
+    assert "dI/I" in text
+    assert "réservoir" in text
+    assert any("reservoir" in path.name for path in written)
     assert "{{" not in text
     assert "{%" not in text
     assert any(path.suffix == ".pdf" for path in written)
+
+
+def test_city_phrase_and_coverage_extent() -> None:
+    assert city_phrase(1_000_000) == "1 million"
+    assert city_phrase(2_500_000) == "2,500,000"
+    missed = coverage_extent([(0, 0.69), (1, 0.50), (2, 0.53), (3, 0.44)], 0.90, 0.05)
+    assert not missed.holds
+    assert not missed.partial
+    assert missed.worst_level == 3
+    assert missed.worst_coverage == 0.44
+    partial = coverage_extent([(0, 0.90), (1, 0.88), (2, 0.40)], 0.90, 0.05)
+    assert partial.partial
+    assert partial.max_ok_level == 1
+    held = coverage_extent([(0, 0.91), (1, 0.88)], 0.90, 0.05)
+    assert held.holds
+    assert held.max_ok_level == 1
+
+
+def _title_context() -> dict[str, object]:
+    return {
+        "city_phrase": "1 million",
+        "course_coverage_pct": 31,
+        "n_forecasts": "80",
+        "high_pct": 90,
+        "calibration_holds": False,
+        "calibration_partial": False,
+        "max_ok_level": 0,
+        "worst_level": 3,
+        "worst_pct": 44,
+        "posterior": {
+            "available": False,
+            "ok": False,
+            "rhat_en": "unavailable",
+            "divergences_en": "unavailable",
+        },
+    }
+
+
+def test_slide_body_stays_under_the_word_cap() -> None:
+    from epidemic.reporting.slide_titles import check_slide_text
+
+    short = "# A title with five words here\n\nOne fact, answered.\n"
+    check_slide_text(short, 40, "recruiter")
+    long = "# A title with five words here\n\n" + " ".join(["word"] * 41) + "\n"
+    with pytest.raises(ValueError, match="plafond"):
+        check_slide_text(long, 40, "recruiter")
+
+
+def test_slide_titles_follow_missing_results() -> None:
+    context = _title_context()
+    recruiter = render_named("slides/recruiter_titles.txt.j2", context).splitlines()
+    technical = render_named("slides/technical_titles.txt.j2", context).splitlines()
+    recruiter = [line for line in recruiter if line.strip()]
+    technical = [line for line in technical if line.strip()]
+    assert len(recruiter) == 7
+    assert len(technical) == 12
+    assert all(len(line.split()) >= 5 for line in recruiter + technical)
+    assert "not estimated yet" in recruiter[2]
+    assert "31% of 80" in recruiter[5]
+    assert "NUTS" not in " ".join(recruiter)
+    assert "not been run" in technical[4]
+    assert "down to 44% at level 3" in technical[10]
 
 
 def test_generated_docs_have_no_empty_fields(tmp_path: Path) -> None:
@@ -94,3 +161,12 @@ def test_generated_docs_have_no_empty_fields(tmp_path: Path) -> None:
         assert text.strip()
         for match in re.findall(r"!\[[^\]]*\]\(([^)]+)\)", text):
             assert (docs / match).is_file(), match
+    slides = docs / "slides"
+    for name, count in (("recruiter_titles.txt", 7), ("technical_titles.txt", 12)):
+        lines = [
+            line
+            for line in (slides / name).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        assert len(lines) == count
+        assert all(len(line.split()) >= 5 for line in lines)

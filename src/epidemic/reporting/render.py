@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Mapping
+from datetime import date
 from pathlib import Path
 from typing import cast
 
@@ -20,6 +21,12 @@ from epidemic.reporting.figures import (
     save_reliability,
 )
 from epidemic.reporting.html_export import markdown_to_html, write_pdf
+from epidemic.reporting.slide_figures import save_slide_figures
+from epidemic.reporting.slide_titles import (
+    check_slide_text,
+    emit_titles,
+    title_groups,
+)
 
 _FIGURES = {
     "priors": "generated/figures/priors.png",
@@ -48,30 +55,70 @@ def render_named(template_name: str, context: Mapping[str, object]) -> str:
 
 
 def export_slides(markdown: Path | None = None) -> list[Path]:
-    """Exporte la présentation Marp en HTML et en PDF si la commande marp existe."""
-    source = markdown or (project_root() / "docs" / "presentation.md")
-    if not source.is_file():
-        raise FileNotFoundError("presentation.md manque. Lancez d'abord epidemic docs.")
+    """Exporte les deux decks Marp en HTML et en PDF."""
+    slides = project_root() / "docs" / "slides"
+    sources = (
+        [markdown]
+        if markdown is not None
+        else [
+            slides / "recruiter.md",
+            slides / "technical.md",
+        ]
+    )
     written: list[Path] = []
-    for suffix in (".html", ".pdf"):
-        target = source.parent / "generated" / f"presentation{suffix}"
-        target.parent.mkdir(parents=True, exist_ok=True)
+    for source in sources:
+        if not source.is_file():
+            raise FileNotFoundError(
+                f"{source.name} manque. Lancez d'abord epidemic docs."
+            )
+        written.extend(_export_marp(source, (".html", ".pdf")))
+    return written
+
+
+def export_slide_pngs() -> list[Path]:
+    """Écrit une image par diapositive, pour relire la mise en page."""
+    slides = project_root() / "docs" / "slides"
+    written: list[Path] = []
+    for name in ("recruiter.md", "technical.md"):
+        written.extend(_export_marp(slides / name, (), images=True))
+    return written
+
+
+def _export_marp(
+    source: Path, suffixes: tuple[str, ...], *, images: bool = False
+) -> list[Path]:
+    """Lance Marp. Sans la commande, la liste reste vide."""
+    theme = source.parent / "theme.css"
+    out = source.parent / "generated"
+    out.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    targets = [out / f"{source.stem}{suffix}" for suffix in suffixes]
+    if images:
+        targets.append(out / f"{source.stem}.png")
+    for target in targets:
+        command = [
+            *_marp_executable(),
+            str(source),
+            "--theme",
+            str(theme),
+            "--allow-local-files",
+            "-o",
+            str(target),
+        ]
+        if target.suffix == ".png":
+            command.append("--images")
+            command.append("png")
         try:
             result = subprocess.run(
-                [
-                    *_marp_executable(),
-                    str(source),
-                    "-o",
-                    str(target),
-                    "--allow-local-files",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
+                command, check=False, capture_output=True, text=True
             )
         except FileNotFoundError:
             return written
-        if result.returncode == 0 and target.is_file():
+        if result.returncode != 0:
+            continue
+        if target.suffix == ".png":
+            written.extend(sorted(out.glob(f"{source.stem}.*.png")))
+        elif target.is_file():
             written.append(target)
     return written
 
@@ -107,6 +154,49 @@ def _marp_executable() -> list[str]:
     return [str(path)]
 
 
+_MONTHS = (
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+)
+
+
+def _slide_identity() -> dict[str, str]:
+    """Nom, date et dépôt lus ici, pour la diapositive de titre."""
+    today = date.today()
+    remote = _git_line(["git", "remote", "get-url", "origin"])
+    return {
+        "slide_author": _git_line(["git", "log", "-1", "--format=%an"]) or "Author",
+        "slide_date": f"{today.day} {_MONTHS[today.month - 1]} {today.year}",
+        "slide_repo": remote.removesuffix(".git") or "local repository",
+    }
+
+
+def _git_line(command: list[str]) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=project_root(),
+        )
+    except OSError:
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()
+
+
 def _write(destination: Path | None, *, report: bool, pdf: bool) -> list[Path]:
     base = output_base(destination)
     settings = load_reporting_config()
@@ -137,8 +227,14 @@ def _write(destination: Path | None, *, report: bool, pdf: bool) -> list[Path]:
         settings,
     )
     context["figure"] = dict(_FIGURES)
+    groups = title_groups(context)
+    context["recruiter_title"] = groups["recruiter_titles.txt"]
+    context["technical_title"] = groups["technical_titles.txt"]
+    context.update(_slide_identity())
     docs_dir = base / settings.docs_dir
     docs_dir.mkdir(parents=True, exist_ok=True)
+    slides = docs_dir / "slides"
+    save_slide_figures(slides / "figures", context)
     written = [
         _emit(
             docs_dir / "framework-bayesien.md",
@@ -147,7 +243,16 @@ def _write(destination: Path | None, *, report: bool, pdf: bool) -> list[Path]:
             docs_dir,
         ),
         _emit(docs_dir / "presentation.md", "presentation.md.j2", context, docs_dir),
+        *emit_titles(docs_dir, context),
+        _emit(slides / "recruiter.md", "slides/recruiter.md.j2", context, slides),
+        _emit(slides / "technical.md", "slides/technical.md.j2", context, slides),
     ]
+    check_slide_text(
+        (slides / "recruiter.md").read_text(encoding="utf-8"), 40, "recruiter"
+    )
+    check_slide_text(
+        (slides / "technical.md").read_text(encoding="utf-8"), 60, "technical"
+    )
     if report:
         report_context = dict(context)
         report_context["figure"] = {

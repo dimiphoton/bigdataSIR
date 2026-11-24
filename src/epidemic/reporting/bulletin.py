@@ -15,6 +15,7 @@ from epidemic.config import (
     load_reporting_config,
     load_thresholds_config,
 )
+from epidemic.forecast.project import LatentSegment
 from epidemic.forecast.scoring import naive_ensemble
 from epidemic.forecast.verbal import verbal_probability
 from epidemic.reporting.context import course_frame
@@ -23,6 +24,16 @@ from epidemic.series import ObservationSeries, observations_from_frame
 from epidemic.simulator.interventions import LABELS
 
 _TEMPLATE = "bulletin.qmd.j2"
+_RESERVOIR_NOTE = (
+    "Abscisse : réservoir infectieux estimé I(t). "
+    "Ordonnée : nouvelles infections estimées par jour. "
+    "Les deux échelles sont logarithmiques. "
+    "La médiane est entourée des bandes à 50 % et 90 %. "
+    "La droite de pente 1 traverse la phase exponentielle initiale, "
+    "où dI/I = β S/N. "
+    "Les marqueurs indiquent le début des interventions. "
+    "Le second panneau montre dI/I au cours du temps, en échelle logarithmique."
+)
 
 
 def write_bulletin(
@@ -30,6 +41,7 @@ def write_bulletin(
     *,
     frame: pd.DataFrame | None = None,
     destination: Path | None = None,
+    intervention_days: list[int] | None = None,
 ) -> list[Path]:
     """Écrit le bulletin du jour demandé, en Quarto et en PDF."""
     settings = load_reporting_config()
@@ -44,17 +56,22 @@ def write_bulletin(
     stem = f"bulletin-j{day:03d}"
     incidence = folder / f"{stem}-incidence.png"
     hospital = folder / f"{stem}-hopital.png"
+    reservoir = folder / f"{stem}-reservoir.png"
+    segment, reservoir_note = _reservoir_segment(day)
     _save_incidence(incidence, payload, settings.figure_dpi)
     _save_hospital(hospital, payload, settings.figure_dpi)
+    _save_reservoir(reservoir, segment, intervention_days, settings.figure_dpi)
     payload["incidence_figure"] = incidence.name
     payload["hospital_figure"] = hospital.name
+    payload["reservoir_figure"] = reservoir.name
+    payload["reservoir_note"] = reservoir_note
     from epidemic.reporting.render import render_named
 
     qmd = folder / f"{stem}.qmd"
     qmd.write_text(render_named(_TEMPLATE, payload), encoding="utf-8")
     pdf = folder / f"{stem}.pdf"
-    _write_pdf(pdf, payload, incidence, hospital)
-    return [qmd, incidence, hospital, pdf]
+    _write_pdf(pdf, payload, incidence, hospital, reservoir)
+    return [qmd, incidence, hospital, reservoir, pdf]
 
 
 def bulletin_payload(day: int, frame: pd.DataFrame) -> dict[str, str]:
@@ -315,6 +332,102 @@ def _tier(day: int, game: GameConfig) -> tuple[int, list[str]]:
     return level, names
 
 
+def _reservoir_segment(day: int) -> tuple[LatentSegment, str]:
+    """Segment latent du jour : posterior s'il couvre le bulletin, sinon grille de β."""
+    posterior = _posterior_reservoir(day)
+    if posterior is not None:
+        return posterior, _RESERVOIR_NOTE
+    return _demo_reservoir(day), (
+        "Aucun posterior n'est enregistré pour ce jour. "
+        "La courbe est la trajectoire latente du modèle d'inférence "
+        "sur une grille de β. " + _RESERVOIR_NOTE
+    )
+
+
+def _posterior_reservoir(day: int) -> LatentSegment | None:
+    """Projection du dernier posterior si sa fenêtre est exactement ce bulletin."""
+    import arviz as az
+
+    from epidemic.config import load_inference_config, resolve_path
+    from epidemic.forecast.idata import draws_from_idata
+    from epidemic.forecast.project import (
+        as_latent_segment,
+        project_scenarios,
+        subsample,
+    )
+    from epidemic.model.age_structure import load_age_structure
+
+    directory = resolve_path(load_inference_config().output_dir)
+    if not directory.is_dir():
+        return None
+    files = sorted(directory.glob("*.nc"), key=lambda item: item.stat().st_mtime)
+    if not files:
+        return None
+    draws = draws_from_idata(az.from_netcdf(files[-1]))
+    if draws.n_past != day:
+        return None
+    if draws.n_draws > 24:
+        draws = subsample(draws, 24, seed=load_reporting_config().seed)
+    structure = load_age_structure(draws.n_groups)
+    projection = project_scenarios(
+        draws,
+        structure,
+        [np.asarray(structure.contacts, dtype=float)],
+        n_days=day,
+        switch_index=day,
+        scales=np.ones((1, draws.n_draws)),
+        seed=load_reporting_config().seed,
+    )[0]
+    return as_latent_segment(projection)
+
+
+def _demo_reservoir(day: int) -> LatentSegment:
+    """Trajectoire du modèle à β fixé sur une petite grille, sans ajustement."""
+    from epidemic.forecast.project import (
+        as_latent_segment,
+        constant_draws,
+        project_scenarios,
+    )
+    from epidemic.model.age_structure import load_age_structure
+
+    structure = load_age_structure(2)
+    n_draws = 6
+    draws = constant_draws(
+        n_draws,
+        day,
+        structure.n_groups,
+        beta=0.06,
+        e0=50.0,
+        process_sigma=0.0,
+    )
+    grid = np.linspace(0.045, 0.08, n_draws)
+    draws.beta_t = grid[:, None] * np.ones(day)
+    projection = project_scenarios(
+        draws,
+        structure,
+        [np.asarray(structure.contacts, dtype=float)],
+        n_days=day,
+        switch_index=day,
+        scales=np.ones((1, n_draws)),
+        seed=load_reporting_config().seed,
+    )[0]
+    return as_latent_segment(projection)
+
+
+def _save_reservoir(
+    path: Path,
+    segment: LatentSegment,
+    intervention_days: list[int] | None,
+    dpi: int,
+) -> None:
+    from epidemic.viz.tracking import plot_reservoir
+
+    figure = plot_reservoir(segment, intervention_days=intervention_days)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path, dpi=dpi)
+    plt.close(figure)
+
+
 def _save_incidence(path: Path, payload: dict[str, str], dpi: int) -> None:
     values = np.array([float(item) for item in payload["positive"].split()])
     day = np.arange(1, values.size + 1)
@@ -362,7 +475,11 @@ def _save_hospital(path: Path, payload: dict[str, str], dpi: int) -> None:
 
 
 def _write_pdf(
-    path: Path, payload: dict[str, str], incidence: Path, hospital: Path
+    path: Path,
+    payload: dict[str, str],
+    incidence: Path,
+    hospital: Path,
+    reservoir: Path,
 ) -> None:
     with PdfPages(path) as pdf:
         figure = plt.figure(figsize=(8.27, 11.69))
@@ -386,32 +503,36 @@ def _write_pdf(
         plt.close(figure)
 
         figure = plt.figure(figsize=(8.27, 11.69))
-        figure.text(0.08, 0.93, "Hôpital et capacité", fontsize=12, fontweight="bold")
-        image_axis = figure.add_axes((0.12, 0.62, 0.76, 0.26))
+        figure.text(0.08, 0.96, "Hôpital et capacité", fontsize=12, fontweight="bold")
+        image_axis = figure.add_axes((0.12, 0.80, 0.76, 0.14))
         image_axis.imshow(plt.imread(hospital))
         image_axis.axis("off")
-        figure.text(0.08, 0.56, "Projections", fontsize=12, fontweight="bold")
-        figure.text(0.08, 0.52, _wrap(payload["outlook"]), fontsize=9, va="top")
+        figure.text(0.08, 0.77, "Réservoir infectieux", fontsize=12, fontweight="bold")
+        image_axis = figure.add_axes((0.10, 0.46, 0.80, 0.29))
+        image_axis.imshow(plt.imread(reservoir))
+        image_axis.axis("off")
+        figure.text(0.08, 0.43, "Projections", fontsize=12, fontweight="bold")
+        figure.text(0.08, 0.40, _wrap(payload["outlook"]), fontsize=8, va="top")
         figure.text(
             0.08,
-            0.40,
+            0.30,
             _wrap(
                 "P(saturation hospitalière, référence naïve) estimée à "
                 f"{payload['probability']} ({payload['verbal']})."
             ),
-            fontsize=9,
+            fontsize=8,
             va="top",
         )
-        figure.text(0.08, 0.30, "Recommandation", fontsize=12, fontweight="bold")
-        figure.text(0.08, 0.26, _wrap(payload["recommendation"]), fontsize=9, va="top")
+        figure.text(0.08, 0.22, "Recommandation", fontsize=12, fontweight="bold")
+        figure.text(0.08, 0.19, _wrap(payload["recommendation"]), fontsize=8, va="top")
         figure.text(
             0.08,
-            0.12,
+            0.06,
             _wrap(
                 f"Plafonds : {payload['max_hospitalized']} hospitalisés, "
                 f"{payload['max_critical']} soins intensifs."
             ),
-            fontsize=9,
+            fontsize=8,
         )
         pdf.savefig(figure)
         plt.close(figure)

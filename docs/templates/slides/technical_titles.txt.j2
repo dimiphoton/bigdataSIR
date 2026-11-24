@@ -1,0 +1,28 @@
+Bayesian SEIRH inference and decision support for a simulated epidemic
+The analyst sees only noisy, partial observations of a hidden process
+The generative model: age-structured SEIRH with an explicit testing layer
+Priors encode the brief, not guesses
+{% if posterior.available and posterior.ok -%}
+NUTS converged: largest R-hat is {{ posterior.rhat_en }}, with {{ posterior.divergences_en }} divergences
+{% elif posterior.available -%}
+NUTS did not pass its checks: largest R-hat is {{ posterior.rhat_en }}, with {{ posterior.divergences_en }} divergences
+{% else -%}
+NUTS has not been run, so convergence is not measured yet
+{% endif %}
+How many parameters the data pin down is not measured yet
+Whether testing rate and hospitalisation rate are confounded is still unknown
+{% if posterior.available -%}
+A posterior file exists, and predictive checks against the data are not scored yet
+{% else -%}
+Posterior predictive checks are not run, because no posterior is saved
+{% endif %}
+Model skill against baselines is not scored, and course baseline ranges cover only {{ course_coverage_pct }}%
+Whether adaptive triggers beat fixed policies is unknown without scored scenarios
+{% if calibration_holds -%}
+Baseline {{ high_pct }}% ranges stay near nominal through stochasticity level {{ max_ok_level }}
+{% elif calibration_partial -%}
+Baseline {{ high_pct }}% ranges hold only through stochasticity level {{ max_ok_level }}
+{% else -%}
+Baseline {{ high_pct }}% ranges miss at every stochasticity level, down to {{ worst_pct }}% at level {{ worst_level }}
+{% endif %}
+Three concrete limits remain, and each one has a next step

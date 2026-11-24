@@ -46,8 +46,10 @@ from epidemic.forecast.probabilities import (
     weekly_probability_below,
 )
 from epidemic.forecast.project import (
+    LatentSegment,
     ParameterDraws,
     Projection,
+    as_latent_segment,
     project_scenarios,
     subsample,
 )
@@ -79,6 +81,7 @@ class BulletinAdvice:
     growth_text: str
     bulletin_day: int
     end_day: int
+    baseline_latent: LatentSegment
 
 
 def prepare_bulletin(
@@ -273,6 +276,7 @@ def prepare_bulletin(
         ),
         bulletin_day=bulletin_day,
         end_day=horizon,
+        baseline_latent=as_latent_segment(baseline_projection),
     )
 
 

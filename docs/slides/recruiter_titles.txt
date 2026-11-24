@@ -1,0 +1,7 @@
+Deciding under uncertainty: steering a simulated epidemic with Bayesian forecasts
+A city of 1 million, incomplete data, and a decision every week
+Confirmed cases are not infections, and that hidden share is not estimated yet
+Hospital saturation risk is not scored until the model has been fitted
+No measure is recommended yet, because saturation risk is still missing
+Only 31% of 80 later outcomes fell inside the 90% simple comparison ranges
+What this project shows about how I work

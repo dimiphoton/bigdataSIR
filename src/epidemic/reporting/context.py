@@ -28,6 +28,7 @@ from epidemic.forecast.scoring import (
 )
 from epidemic.inference.validation import load_course_series
 from epidemic.reporting.priors_table import markdown_table, prior_rows
+from epidemic.reporting.slide_titles import city_phrase, coverage_extent
 from epidemic.reporting.text import format_auto, format_fr, format_percent, french_date
 from epidemic.series import ObservationSeries, observations_from_frame
 from epidemic.simulator.engine import RealitySimulator
@@ -161,8 +162,76 @@ def build_context() -> dict[str, object]:
         "early_hospital": format_fr(game.early_tier2.hospital_threshold, 0),
         "early_tier3": format_percent(game.early_tier3.probability, 0),
     }
+    _add_slide_facts(
+        context,
+        population=simulator.population,
+        course=course,
+        course_score=course_score,
+        level_scores=level_scores,
+        levels=list(reporting.score_levels),
+        nominal=high_mass,
+        tolerance=reporting.coverage_tolerance,
+        cap_hospital=thresholds.max_hospitalized,
+        cap_icu=thresholds.max_critical,
+        rhat_limit=inference.diagnostics.max_rhat,
+        ess_min=int(inference.diagnostics.min_ess),
+        max_div=inference.diagnostics.max_divergences,
+        ident_ratio=inference.identifiability.well_below,
+        alpha=decision.alpha,
+    )
     _assert_filled(context)
     return context
+
+
+def _add_slide_facts(
+    context: dict[str, object],
+    *,
+    population: int,
+    course: ObservationSeries,
+    course_score: SeriesScore,
+    level_scores: list[SeriesScore],
+    levels: list[int],
+    nominal: float,
+    tolerance: float,
+    cap_hospital: int,
+    cap_icu: int,
+    rhat_limit: float,
+    ess_min: int,
+    max_div: int,
+    ident_ratio: float,
+    alpha: float,
+) -> None:
+    """Ajoute les champs anglais des diapositives, sans chiffre écrit à la main."""
+    if len(levels) != len(level_scores):
+        raise ValueError("Niveaux et scores n'ont pas la même longueur.")
+    extent = coverage_extent(
+        [
+            (level, score.coverage(high=True))
+            for level, score in zip(levels, level_scores, strict=True)
+        ],
+        nominal,
+        tolerance,
+    )
+    context["city_phrase"] = city_phrase(population)
+    context["course_coverage_pct"] = int(round(100 * course_score.coverage(high=True)))
+    context["high_pct"] = int(round(100 * nominal))
+    context["calibration_holds"] = extent.holds
+    context["calibration_partial"] = extent.partial
+    context["max_ok_level"] = extent.max_ok_level
+    context["worst_level"] = extent.worst_level
+    context["worst_pct"] = int(round(100 * extent.worst_coverage))
+    context["level_pcts"] = [
+        int(round(100 * score.coverage(high=True))) for score in level_scores
+    ]
+    context["peak_hospital"] = int(np.max(course.num_hospitalised))
+    context["peak_icu"] = int(np.max(course.num_critical))
+    context["cap_hospital"] = int(cap_hospital)
+    context["cap_icu"] = int(cap_icu)
+    context["rhat_limit"] = f"{rhat_limit:.2f}"
+    context["ess_min"] = ess_min
+    context["max_div"] = max_div
+    context["ident_ratio"] = f"{ident_ratio:.2f}"
+    context["alpha_pct"] = int(round(100 * alpha))
 
 
 def score_labeled(
@@ -346,6 +415,9 @@ def _posterior_status() -> dict[str, object]:
         "rhat": "non calculé",
         "ess": "non calculé",
         "divergences": "non calculé",
+        "ok": False,
+        "rhat_en": "unavailable",
+        "divergences_en": "unavailable",
     }
     if not files:
         return empty
@@ -377,6 +449,13 @@ def _posterior_status() -> dict[str, object]:
         "ess": "non calculé" if report.min_ess is None else format_auto(report.min_ess),
         "divergences": (
             "non calculé" if report.divergences is None else str(report.divergences)
+        ),
+        "ok": report.ok and report.max_rhat is not None,
+        "rhat_en": (
+            "unavailable" if report.max_rhat is None else f"{report.max_rhat:.2f}"
+        ),
+        "divergences_en": (
+            "unavailable" if report.divergences is None else str(report.divergences)
         ),
     }
 
