@@ -1,0 +1,192 @@
+# Documentation du cadre bayésien
+
+Ce texte est produit par `make docs`. Les chiffres, le tableau des priors et les figures viennent des fichiers de `configs/` et des calculs du projet. La graine utilisée est {{ seed }}.
+
+## 1. Pourquoi bayésien
+
+**Intuition.** Une décision publique ne demande pas un seul chiffre « le plus probable ». Elle demande une probabilité : celle de dépasser {{ max_hospitalized }} hospitalisés ou {{ max_critical }} lits de soins intensifs avant le {{ end_date }}. Cette probabilité n'existe que si l'on a une loi sur les futurs possibles.
+
+**Formalisation.** Après avoir vu les données \(y\), la loi des paramètres \(\theta\) est
+
+\[
+p(\theta \mid y) = \frac{p(y \mid \theta)\, p(\theta)}{p(y)}.
+\]
+
+\(p(\theta)\) est le prior, \(p(y \mid \theta)\) la vraisemblance, \(p(\theta \mid y)\) la loi a posteriori. Une prévision est une moyenne de trajectoires tirées dans cette loi, bruitées par le processus.
+
+**Choix du projet.** Le rapport de 2020 ajustait des courbes par moindres carrés et produisait une trajectoire ponctuelle. Ici le prior reprend les plages des consignes, et la sortie utile est P(saturation), pas un résidu quadratique. Le seuil de décision par défaut est \(\alpha =\) {{ alpha }}.
+
+**Ce qu'on en tire.** La règle retenue est : l'intervention la moins coûteuse telle que P(saturation) estimée reste au plus {{ alpha }}. Les autres seuils étudiés sont {{ alphas }}.
+
+## 2. Le problème
+
+**Intuition.** La ville a {{ population }} habitants. Le premier jour est le {{ day1 }}, le dernier jour de jeu est le jour {{ end_day }} ({{ end_date }}). Chaque jour on publie des cas confirmés, des tests, des hospitalisés, des soins intensifs et des décès. On ne publie pas le nombre d'infectés.
+
+**Formalisation.** Trois états ne doivent pas être confondus. L'état infectieux est latent : susceptible, exposé, infectieux asymptomatique, infectieux symptomatique, hôpital, soins intensifs, rétabli, décédé. L'état de surveillance dit si la personne n'a pas été testée, a été testée négative, ou est un cas confirmé. Un faux négatif reste infectieux. Le facteur de sous-déclaration est le rapport entre infections réelles et cas confirmés.
+
+**Choix du projet.** La sensibilité est entre {{ sensitivity_low }} et {{ sensitivity_high }}. La spécificité vaut {{ specificity }} par défaut. Au moins {{ min_tested }} des symptomatiques sont testés. Les asymptomatiques ne le sont pas, sauf extension de dépistage, qui est éteinte. Toute hospitalisation non encore confirmée est comptée positive le jour de l'admission.
+
+**Ce qu'on en tire.** {{ growth_sentence }} Cette pente décrit les cas confirmés, pas les infections estimées.
+
+## 3. Le modèle génératif
+
+**Intuition.** On écrit d'abord comment l'épidémie avance, puis comment les tests la voient. Le modèle d'inférence est volontairement plus pauvre que la ville : il n'a pas de stade présymptomatique.
+
+**Formalisation.** Par groupe d'âge, le pas d'un jour est une chaîne d'espérances. La probabilité de quitter un stade de durée moyenne \(d\) est \(1 - e^{-1/d}\). La force d'infection du groupe \(g\) est
+
+\[
+\lambda_g(t) = \beta(t) \sum_j C_{gj} \frac{I_{a,j}(t)\,\kappa + I_{s,j}(t)}{N_j},
+\]
+
+où \(C\) est la matrice de contact, \(\kappa\) la contagiosité relative des asymptomatiques, et \(N_j\) la population du groupe. Les nouveaux cas confirmés attendus valent
+
+\[
+\mathbb{E}[\text{positifs}(t)] = \text{sensibilité} \times p_{\text{test}}(t) \times \text{nouveaux symptomatiques}(t) + \text{admissions non encore confirmées}(t).
+\]
+
+Les tests ajoutent un fond de syndromes grippaux, des personnes non infectées. Avec une spécificité de {{ specificity }}, ces tests sont négatifs.
+
+**Choix du projet.** Il y a {{ age_groups }} groupes d'âge. Les séries publiées ne sont pas ventilées par âge : la séparation entre groupes vient du prior et de la matrice de contact, pas d'une observation directe. \(\beta(t)\) est, dans le réglage actuel, une {{ beta_mode }}. La variante {{ variant }} est le défaut : seul \(\beta(t)\) bouge, et la concentration de la binomiale négative est fixée à {{ fixed_concentration }}. La variante B laisse bouger le taux de dépistage et estime la surdispersion. La variante C ajoute un bruit normal d'échelle binomiale sur les nouvelles infections. La vraisemblance par défaut est une binomiale négative, parce qu'une Poisson sous-estime la variance d'un comptage épidémique.
+
+**Ce qu'on en tire.** Le schéma ci-dessous est dessiné depuis la liste des flux du code. Les flèches en pointillés sont l'observation.
+
+![Compartiments du modèle d'inférence]({{ figure.compartments }})
+
+```mermaid
+{{ mermaid_inference }}
+```
+
+Le simulateur, lui, garde un stade présymptomatique :
+
+```mermaid
+{{ mermaid_simulator }}
+```
+
+Le DAG NumPyro (`numpyro.render_model`) est tenté au moment de l'ajustement. Sans Graphviz, le schéma de compartiments et le tableau des priors restent la référence.
+
+## 4. Les priors, un par un
+
+**Intuition.** Avant les données, le modèle ne doit produire que des épidémies compatibles avec ce que les consignes rendent plausible. Une proportion reçoit une loi Beta. Une durée strictement positive reçoit une loi log-normale, calée pour que l'intervalle des consignes soit un intervalle central.
+
+**Formalisation.** Pour une log-normale, si l'intervalle central à 90 % vaut \([a, b]\), alors \(\mu = (\log a + \log b) / 2\) et \(\sigma = (\log b - \log a) / (2 z_{0,90})\). Pour une Beta de moyenne \(m\) et d'écart-type \(s\), \(\alpha = m\kappa\) et \(\beta = (1-m)\kappa\) avec \(\kappa = m(1-m)/s^2 - 1\).
+
+**Choix du projet.** L'incubation va de {{ incubation_low }} à {{ incubation_high }} jours, la période symptomatique avant l'hôpital de {{ symptom_days_low }} à {{ symptom_days_high }} jours, la fraction symptomatique de {{ symptomatic_low }} à {{ symptomatic_high }}. Le taux de dépistage est une Beta décalée au-dessus de {{ min_tested }}, peu informative au-dessus de ce plancher. Les taux de gravité sont des logit-normales hiérarchiques : les groupes partagent une moyenne, et une pente d'âge strictement positive rend le prior des plus âgés plus haut. Ce qui n'est pas dans les consignes est marqué « hypothèse » et repris dans `docs/hypotheses.md`.
+
+**Ce qu'on en tire.** Intervalle à 95 % calculé depuis les paramètres du code, pas saisi à la main.
+
+{{ prior_table }}
+
+![Densités a priori]({{ figure.priors }})
+
+La vérification a priori fait tourner {{ prior_draws }} trajectoires de {{ prior_days }} jours. Les paramètres sont tirés dans ces lois, la dynamique est le scan du modèle, et les cas confirmés reçoivent un bruit gamma-Poisson de concentration {{ fixed_concentration }}.
+
+![Trajectoires a priori]({{ figure.prior_predictive }})
+
+## 5. L'inférence
+
+**Intuition.** La loi a posteriori n'a pas de formule fermée : le dénominateur \(p(y)\) est une intégrale sur tous les paramètres et toutes les trajectoires. On ne la calcule pas. On en tire des échantillons.
+
+**Formalisation.** NUTS est un Hamiltonian Monte Carlo. Une bille lancée sur la surface d'énergie \(-\log p(\theta, y)\) suit une trajectoire qui explore les zones probables. JAX dérive cette énergie à travers le scan, donc à travers la simulation d'un jour. Les marches aléatoires de \(\beta\) sont écrites en variables non centrées, et plusieurs paramètres positifs sont échantillonnés sur l'échelle log.
+
+**Choix du projet.** La méthode par défaut est {{ method }}, avec {{ chains }} chaînes, {{ warmup }} pas d'échauffement et {{ draws }} tirages. Le SVI ({{ svi_steps }} pas) sert aux essais courts. Il ne fournit ni R̂ ni ESS.
+
+**Ce qu'on en tire.** {{ posterior.status }}
+
+## 6. Diagnostics
+
+**Intuition.** Des chaînes qui n'ont pas exploré la même région ne doivent pas servir à une décision. On le vérifie avant de projeter.
+
+**Formalisation.** Le R̂ compare la variance entre les chaînes à la variance dans chaque chaîne. Il doit rester sous {{ max_rhat }}. L'ESS estime le nombre de tirages indépendants. Il doit rester au moins à {{ min_ess }}. Une divergence signale une région où la trajectoire hamiltonienne a échoué. Le maximum autorisé est {{ max_divergences }}. Si un seuil est dépassé, l'ajustement NUTS s'arrête.
+
+**Choix du projet.** Ces seuils sont dans `configs/inference.yaml`. Les traces et les densités prior / posterior sont écrites à côté du fichier `.nc` quand `save_plots` est vrai.
+
+**Ce qu'on en tire.** R̂ du dernier fichier lu : {{ posterior.rhat }}. ESS minimum : {{ posterior.ess }}. Divergences : {{ posterior.divergences }}.
+
+## 7. Ce que les données ont appris
+
+**Intuition.** Un paramètre est bien identifié si les données rétrécissent fortement son intervalle. S'il reste aussi large qu'a priori, c'est le prior qui parle, pas les observations.
+
+**Formalisation.** On compare la largeur a posteriori à la largeur a priori. Si ce rapport est sous {{ well_below }}, le paramètre est lu comme bien identifié. Entre {{ well_below }} et {{ partial_below }}, il est partiellement identifié. Au-dessus, il est dicté par le prior. Les paires dépistage × hospitalisation, ou \(\beta\) × fraction symptomatique, peuvent rester liées : plusieurs combinaisons prédisent les mêmes cas confirmés.
+
+**Choix du projet.** La courbe d'apprentissage réajuste le modèle aux jours {{ learning_days }}. Elle n'est chiffrée dans ce document que lorsqu'un posterior est présent. Ajouter les hospitalisations, puis le taux de positivité, réduit en principe l'ambiguïté, parce que l'hôpital informe la gravité et le taux de positivité informe le fond de tests.
+
+**Ce qu'on en tire.** {{ posterior.status }} {{ model_score_status }}
+
+## 8. Vérifications
+
+**Intuition.** On demande au modèle de retrouver des paramètres qu'on a soi-même tirés, puis de prévoir des jours qu'on lui cache.
+
+**Formalisation.** La couverture à 90 % est la part des vraies valeurs qui tombent dans l'intervalle central à 90 %. Le CRPS compare tout l'ensemble de prévision à la valeur réalisée. Le backtesting ajuste jusqu'au jour \(t\) et score les horizons 7, 14 et 21 jours contre la persistance et une croissance exponentielle.
+
+**Choix du projet.** Le tableau ci-dessous n'est pas encore ce backtesting du modèle. C'est la même grille d'horizons {{ horizons }}, appliquée aux références naïves, sur les cas confirmés du cours et sur des villes simulées. Ainsi le calcul de couverture, de CRPS et de Brier est exécutable sans un NUTS de plusieurs heures. {{ model_score_status }}
+
+**Ce qu'on en tire.** {{ course_sentence }} {{ course_interpretation }} Le score de Brier des événements « hospitalisés au-dessus de {{ max_hospitalized }} dans les {{ event_horizon }} jours » vaut {{ course_brier }} pour la persistance. {{ course_event_note }} Le CRPS moyen vaut {{ course_crps_persistence }} pour la persistance et {{ course_crps_exponential }} pour la croissance exponentielle, sur {{ n_forecasts }} prévisions.
+
+{{ course_table }}
+
+Même calcul sur une trajectoire publique par niveau de stochasticité, graine {{ seed }}. Le modèle ne lit pas le fichier secret de ces trajectoires.
+
+{{ level_table }}
+
+![Fiabilité de la référence naïve]({{ figure.reliability }})
+
+## 9. De la loi a posteriori à la décision
+
+**Intuition.** Une fois les paramètres tirés, on rejoue l'avenir avec du bruit. Deux futurs peuvent partager les mêmes paramètres et diverger. P(saturation) est la part de ces futurs qui touchent un plafond.
+
+**Formalisation.** La loi prédictive a posteriori est
+
+\[
+p(y_{\text{futur}} \mid y) = \int p(y_{\text{futur}} \mid \theta)\, p(\theta \mid y)\, d\theta.
+\]
+
+Une intervention devient un facteur sur \(\beta\), calculé depuis les matrices de contact par lieu. Le masque se multiplie avec les autres mesures. Quand on combine des mesures de contact, c'est la réduction la plus forte qui s'applique. L'isolement des cas et la quarantaine du ménage sont incompatibles. Le respect moyen est {{ compliance }}. Le masque réduit le taux d'infection de {{ mask_reduction }} avant ce respect. Le délai de mise en œuvre est {{ delay_days }} jours, et une mesure dure au moins {{ min_policy_days }} jours.
+
+**Choix du projet.** La recommandation minimise le coût cumulé sous P(saturation) ≤ {{ alpha }}. Les durées d'isolement étudiées sont {{ isolation_durations }} jours. Les âges seuils de la distanciation sont {{ age_thresholds }} ans. Une règle conditionnelle active une mesure si un indicateur observé, donc bruité, dépasse un seuil haut, et la lève s'il repasse sous un seuil bas. Elle ne voit pas l'état latent. Le palier 2 peut s'ouvrir avant la date si P(H > {{ early_hospital }} dans les 28 jours) dépasse {{ early_tier2 }}. Le palier 3 peut s'ouvrir si P(saturation) dépasse {{ early_tier3 }}.
+
+**Ce qu'on en tire.** Coûts journaliers lus dans la configuration du jeu. La frontière coût / risque des scénarios est tracée quand un posterior est chargé dans l'application. Sans ce fichier, le graphe ci-dessous est l'échelle de coût, pas une probabilité inventée.
+
+{{ cost_table }}
+
+![Coût journalier des contraintes]({{ figure.costs }})
+
+Les projections affichées dans un bulletin couvrent {{ bulletin_horizons }} jours. Les éventails du modèle (médiane, 50 %, 90 %) portent sur les hospitalisés, les soins intensifs, les décès, les cas confirmés et Rt.
+
+Le graphe nouvelles infections contre le réservoir infectieux porte en abscisse le réservoir infectieux estimé \(I(t)\) et en ordonnée les nouvelles infections estimées par jour, tous deux en échelle logarithmique, avec la médiane a posteriori et les bandes à 50 % et 90 %. En phase exponentielle, \(\mathrm{d}I/I = \beta S/N\) : sur ce graphe, c'est une droite de pente 1 tracée à travers le début de la vague. Un marqueur indique chaque date de début d'intervention. Le second panneau montre \(\mathrm{d}I/I\) au cours du temps, toujours en échelle logarithmique. Quand la trajectoire passe sous la droite, chaque personne infectieuse en génère moins, soit parce que la part de susceptibles \(S/N\) baisse, soit parce qu'une intervention a réduit \(\beta\).
+
+## 10. Calibration
+
+**Intuition.** Annoncer 90 % ne vaut rien si la réalité ne tombe dans l'intervalle que six fois sur dix. On compare donc les probabilités annoncées aux fréquences observées, après coup.
+
+**Formalisation.** La couverture empirique est le nombre de réussites divisé par le nombre de prévisions. Le diagramme de fiabilité regroupe les probabilités annoncées par classes et y porte la fréquence observée. Le score de Brier est la moyenne de \((p - y)^2\), où \(y\) vaut 0 ou 1. Le CRPS fait la même idée pour une série continue.
+
+**Choix du projet.** Pour chaque bulletin, chaque horizon parmi {{ horizons }} jours, et chaque série (cas confirmés, hospitalisés, soins intensifs, nouveaux décès), on regarde si la valeur réalisée tombe dans l'intervalle à {{ low_mass }} et dans l'intervalle à {{ high_mass }}. L'interprétation utilise une tolérance autour du niveau nominal : en dessous, les intervalles sont trop sûrs d'eux ; au-dessus, ils sont trop prudents.
+
+**Ce qu'on en tire.** {{ course_sentence }} {{ course_interpretation }} {{ model_score_status }}
+
+## 11. Limites et hypothèses
+
+**Intuition.** Le modèle est plus simple que la ville. Cet écart est voulu : sinon l'inférence tricherait en voyant la vérité.
+
+**Formalisation.** La ville a un stade présymptomatique, des contacts par lieu, et, aux niveaux 2 et 3, une dérive de \(\beta\) et une hétérogénéité individuelle. Le modèle d'inférence agrège cela dans \(\beta(t)\) et dans la surdispersion. Les faux négatifs restent infectieux dans la ville. Le modèle les compte, il ne les retire pas des infectieux.
+
+**Choix du projet.** Le texte qui suit est recopié depuis `docs/hypotheses.md` au moment de la génération.
+
+**Ce qu'on en tire.**
+
+{{ hypotheses }}
+
+## 12. Glossaire et références
+
+| Français | English | Sens dans le projet |
+|---|---|---|
+| loi a priori | prior | ce que les consignes rendent plausible avant les données |
+| loi a posteriori | posterior | la même loi, mise à jour par les séries publiées |
+| vraisemblance | likelihood | probabilité des données pour des paramètres fixés |
+| cas confirmé | confirmed case | test positif, ou admission qui force un positif |
+| sous-déclaration | under-reporting | infections réelles / cas confirmés |
+| faux négatif | false negative | infecté testé, résultat négatif, encore contagieux |
+| couverture | coverage | part des réalisations tombées dans l'intervalle annoncé |
+| saturation | overload | hospitalisés au-dessus de {{ max_hospitalized }} ou soins intensifs au-dessus de {{ max_critical }} |
+
+Références utilisées pour le cadre, pas pour copier un résultat : Chowell, « Fitting dynamic models to epidemic outbreaks with quantified uncertainty » (2017) ; Gelman et al., « Bayesian workflow » (2020) ; la documentation NumPyro ; le simulateur d'épidémie de l'IISc (`cni-iisc/epidemic-simulator`), dont le cours s'inspire ; les consignes de `ADelau/proj0016-epidemic-data`.

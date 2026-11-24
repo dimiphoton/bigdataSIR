@@ -1,0 +1,44 @@
+# Aide à la décision. Les coûts journaliers restent dans configs/game.yaml.
+# alpha : on retient la mesure la moins coûteuse avec P(saturation) <= alpha.
+
+alpha: 0.05
+alphas: [0.01, 0.05, 0.10, 0.20]
+isolation_durations: [7, 10, 14]
+age_thresholds: [50, 60, 70]
+forecast_draws: 64
+future_seed: 0
+share_samples: 32
+# Dirichlet : plus la concentration est grande, plus les parts de transmission
+# restent proches des poids de configs/simulator.yaml.
+share_concentration: 40
+interval_masses: [0.5, 0.9]
+
+# Point de référence pour la part des infectieux qu'un isolement touche.
+# L'écart-type sert à propager l'incertitude, avec les parts par lieu.
+isolation_reach:
+  symptomatic_fraction: 0.60
+  confirmation_probability: 0.55
+  # Haut de la plage symptomatic_before_hospital_days (priors.yaml).
+  # 7 jours ne couvrent pas toute la plage ; 10 et 14 jours la saturent.
+  infectious_days: 10
+reach_spread:
+  symptomatic_fraction: 0.05
+  confirmation_probability: 0.08
+  infectious_days: 1.5
+
+compliances: [0.7, 0.9, 1.0]
+
+# cases_high est une somme sur 7 jours. positivity est un taux sur 7 jours.
+# default_indicators limite la recherche lancée depuis l'application.
+policy_grid:
+  indicators: [hospital, icu, cases_7d, positivity]
+  default_indicators: [hospital]
+  hospital_high: [400, 800, 1200]
+  hospital_low: [200, 500]
+  icu_high: [80, 150]
+  icu_low: [40, 80]
+  cases_high: [200, 500]
+  cases_low: [50, 150]
+  positivity_high: [0.10, 0.20]
+  positivity_low: [0.05, 0.10]
+  hold_days: [3, 7]

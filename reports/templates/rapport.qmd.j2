@@ -1,0 +1,77 @@
+---
+title: "Rapport — SEIR bayésien, PROJ0016"
+lang: fr
+format:
+  html: default
+  pdf:
+    documentclass: article
+    papersize: a4
+---
+
+# Rapport
+
+Ville de {{ population }} habitants, du {{ day1 }} au {{ end_date }}. Document généré, graine {{ seed }}. Le développement long est dans `docs/framework-bayesien.md`.
+
+## 1. Contexte
+
+Le cours publiait chaque jour des séries partielles. La décision consiste à rester sous {{ max_hospitalized }} hospitalisés et {{ max_critical }} soins intensifs jusqu'au {{ end_date }}, avec l'intervention la moins contraignante. L'approche bayésienne produit P(saturation), pas une trajectoire unique.
+
+## 2. Données
+
+Colonnes publiées : cas confirmés, tests, hospitalisés, hospitalisations cumulées, soins intensifs, décès cumulés. La sensibilité annoncée va de {{ sensitivity_low }} à {{ sensitivity_high }}, la spécificité vaut {{ specificity }}, et au moins {{ min_tested }} des symptomatiques sont testés. {{ growth_sentence }}
+
+## 3. Modèle
+
+Variante {{ variant }}, {{ age_groups }} groupes d'âge, \(\beta(t)\) en {{ beta_mode }}. L'incubation va de {{ incubation_low }} à {{ incubation_high }} jours, la période symptomatique de {{ symptom_days_low }} à {{ symptom_days_high }} jours, la fraction symptomatique de {{ symptomatic_low }} à {{ symptomatic_high }}.
+
+![Compartiments]({{ figure.compartments }})
+
+{{ prior_table }}
+
+![Priors]({{ figure.priors }})
+
+## 4. Inférence et diagnostics
+
+{{ method }}, {{ chains }} chaînes, {{ warmup }} pas d'échauffement, {{ draws }} tirages. Seuils : R̂ sous {{ max_rhat }}, ESS au moins {{ min_ess }}, au plus {{ max_divergences }} divergence. {{ posterior.status }} R̂ lu : {{ posterior.rhat }}. ESS lu : {{ posterior.ess }}. Divergences lues : {{ posterior.divergences }}.
+
+## 5. Validation
+
+{{ course_sentence }} {{ course_interpretation }} CRPS persistance {{ course_crps_persistence }}, CRPS croissance {{ course_crps_exponential }}, Brier {{ course_brier }}, sur {{ n_forecasts }} prévisions naïves. {{ model_score_status }}
+
+{{ course_table }}
+
+{{ level_table }}
+
+La courbe d'apprentissage est prévue aux jours {{ learning_days }}. Un rapport de largeurs sous {{ well_below }} est lu comme bien identifié, sous {{ partial_below }} comme partiellement identifié.
+
+## 6. Projections
+
+![Trajectoires a priori]({{ figure.prior_predictive }})
+
+{{ prior_draws }} tirages de {{ prior_days }} jours, paramètres dans les priors, dynamique du scan, bruit gamma-Poisson de concentration {{ fixed_concentration }}. Les horizons de bulletin sont {{ bulletin_horizons }} jours.
+
+## 7. Probabilités de saturation
+
+La saturation est le dépassement de {{ max_hospitalized }} hospitalisés ou de {{ max_critical }} soins intensifs. L'événement scoré ici est le dépassement hospitalier dans les {{ event_horizon }} jours, pour la référence naïve. Son score de Brier est {{ course_brier }}. {{ course_event_note }}
+
+![Fiabilité]({{ figure.reliability }})
+
+## 8. Recommandation
+
+Règle : coût cumulé minimal sous P(saturation) ≤ {{ alpha }}. Autres seuils : {{ alphas }}. Délai {{ delay_days }} jours, durée minimale {{ min_policy_days }} jours, respect {{ compliance }}. Isolement : {{ isolation_durations }} jours. Distanciation : {{ age_thresholds }} ans. Le palier 2 peut s'ouvrir plus tôt si la probabilité que les hospitalisés dépassent {{ early_hospital }} dépasse {{ early_tier2 }}. Le palier 3, si P(saturation) dépasse {{ early_tier3 }}.
+
+{{ cost_table }}
+
+![Coûts]({{ figure.costs }})
+
+## 9. Calibration en fin de partie
+
+{{ course_sentence }} {{ course_interpretation }} La ventilation par niveau de stochasticité est le second tableau de la section 5. Les mêmes indicateurs seront recalculés sur les tirages du modèle dès qu'un posterior sera scoré.
+
+## 10. Limites
+
+Le modèle n'a pas de stade présymptomatique. Il ne lit pas les paramètres secrets de la ville. Les détails sont dans `docs/hypotheses.md`, recopié dans la documentation longue au moment de `make docs`.
+
+## 11. Reproductibilité
+
+`make install`, puis `make all`. La graine de rendu est {{ seed }}. Les commandes `epidemic docs`, `epidemic report`, `epidemic bulletin --day 21` et `epidemic slides` relisent les YAML. Aucun chiffre de ce rapport n'est saisi dans le gabarit.

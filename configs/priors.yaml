@@ -1,0 +1,18 @@
+# Bornes tirées des consignes du cours.
+# Les familles de lois (Beta, Gamma, etc.) seront choisies en phase 3.
+
+population: 1000000
+symptomatic_fraction:
+  low: 0.50
+  high: 0.70
+test_sensitivity:
+  low: 0.70
+  high: 0.85
+test_specificity: 1.0
+min_fraction_symptomatic_tested: 0.50
+incubation_days:
+  low: 1
+  high: 5
+symptomatic_before_hospital_days:
+  low: 4
+  high: 10

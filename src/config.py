@@ -19,7 +19,8 @@ N = 1_000_000
 # Initial state vector [S, E, I, H, ICU, R, D]
 # S: Susceptible, E: Exposed, I: Infected, H: Hospitalized
 # ICU: Intensive Care, R: Recovered, D: Deceased
-initial_state = np.array([N - 15, 5, 10, 0, 0, 0, 0])
+# By adding a decimal point, you create a float array
+initial_state = np.array([N - 15., 5., 10., 0., 0., 0., 0.])
 
 # Number of days to simulate
 days = 30

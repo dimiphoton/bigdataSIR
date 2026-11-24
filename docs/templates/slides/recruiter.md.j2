@@ -1,0 +1,117 @@
+---
+marp: true
+theme: project
+paginate: true
+---
+
+<!-- _class: lead -->
+
+# {{ recruiter_title[0] }}
+
+{{ slide_author }}
+
+{{ slide_date }}
+
+App: `app/accueil.py`
+
+<!--
+Open on the decision, not on the method.
+The app is the thing they can click.
+One million people, one weekly choice, an incomplete picture.
+-->
+
+---
+
+# {{ recruiter_title[1] }}
+
+![bg right:54% fit](figures/tested.png)
+
+What is known on decision day?
+
+- Published series are tested cases
+- A negative test can miss an infection
+- The week ends before the outcome is known
+
+<!--
+Point at the gap between the two curves.
+Tested is not the same count as confirmed, and neither is the infected population.
+The decision is taken on this picture, every week.
+-->
+
+---
+
+# {{ recruiter_title[2] }}
+
+![bg right:54% fit](figures/confirmed.png)
+
+Where is the infection curve?
+
+Only confirmed cases are drawn. The hidden share is not estimated.
+
+<!--
+Do not invent a second curve.
+Say plainly that the model has not produced that share yet.
+The chart is the count a manager would actually be handed.
+-->
+
+---
+
+# {{ recruiter_title[3] }}
+
+![bg right:52% fit](figures/beds.png)
+
+How close did the beds get to the cap?
+
+Ward peaked at {{ peak_hospital }}, cap {{ cap_hospital }}. ICU peaked at {{ peak_icu }}, cap {{ cap_icu }}.
+
+<!--
+Read the two peaks against the two caps.
+If the cap line is absent, the peak is far below it and the scale stays readable.
+No saturation probability is attached to this chart.
+-->
+
+---
+
+# {{ recruiter_title[4] }}
+
+![bg right:54% fit](figures/costs.png)
+
+Which measure is selected?
+
+None. The risk is missing, so cost is not traded against it.
+
+<!--
+The bars are the daily social cost, cheapest at the top.
+Do not pick one. The rule needs a risk, and that risk is not scored.
+-->
+
+---
+
+# {{ recruiter_title[5] }}
+
+![bg right:50% fit](figures/coverage.png)
+
+What share of later outcomes fell inside the announced range?
+
+Realised {{ course_coverage_pct }}%. Announced {{ high_pct }}%.
+
+<!--
+These ranges are a simple comparison, not a fitted model.
+{{ n_forecasts }} later outcomes were scored.
+The gap between the two bars is the whole point.
+-->
+
+---
+
+# {{ recruiter_title[6] }}
+
+- The model never reads the hidden city
+- Ranges are scored on later outcomes
+- No measure is picked while the risk is missing
+
+JAX, NumPyro, ArviZ, Streamlit
+
+<!--
+Close on three habits: separation of the hidden city, scored ranges, silence when the risk is missing.
+Name the stack once, then stop.
+-->

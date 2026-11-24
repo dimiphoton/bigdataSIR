@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.11"
+          enable-cache: true
+      - name: Installer les dépendances
+        run: uv sync --all-groups --frozen
+      - name: Ruff
+        run: |
+          uv run ruff check src/epidemic app tests
+          uv run ruff format --check src/epidemic app tests
+      - name: Mypy
+        run: uv run mypy src/epidemic
+      - name: Pytest
+        run: uv run pytest
+      - name: Documentation
+        run: uv run epidemic docs

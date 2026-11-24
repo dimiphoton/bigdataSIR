@@ -1,0 +1,12 @@
+Bayesian SEIRH inference and decision support for a simulated epidemic
+The analyst sees only noisy, partial observations of a hidden process
+The generative model: age-structured SEIRH with an explicit testing layer
+Priors encode the brief, not guesses
+NUTS has not been run, so convergence is not measured yet
+How many parameters the data pin down is not measured yet
+Whether testing rate and hospitalisation rate are confounded is still unknown
+Posterior predictive checks are not run, because no posterior is saved
+Model skill against baselines is not scored, and course baseline ranges cover only 31%
+Whether adaptive triggers beat fixed policies is unknown without scored scenarios
+Baseline 90% ranges miss at every stochasticity level, down to 44% at level 3
+Three concrete limits remain, and each one has a next step

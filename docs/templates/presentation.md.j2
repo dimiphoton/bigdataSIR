@@ -1,0 +1,121 @@
+---
+marp: true
+paginate: true
+lang: fr
+---
+
+# Une ville, une loi, une décision
+
+PROJ0016, refonte bayésienne. {{ population }} habitants, du {{ day1 }} au {{ end_date }}.
+
+![Schéma]({{ figure.compartments }})
+
+---
+
+# Ce que l'on voit
+
+Cas confirmés, tests, hospitalisés, soins intensifs, décès. Pas les infectés.
+
+Rester sous {{ max_hospitalized }} hospitalisés et {{ max_critical }} soins intensifs.
+
+![Coûts]({{ figure.costs }})
+
+---
+
+# Pourquoi une loi
+
+P(saturation) n'existe que si plusieurs futurs restent possibles.
+
+Seuil de décision : {{ alpha }}.
+
+![A priori]({{ figure.prior_predictive }})
+
+---
+
+# Le modèle
+
+SEIRH par âge, variante {{ variant }}, \(\beta(t)\) en {{ beta_mode }}.
+
+L'observation est en pointillés : test, sensibilité, faux négatif.
+
+![Compartiments]({{ figure.compartments }})
+
+---
+
+# Les priors
+
+Incubation {{ incubation_low }}–{{ incubation_high }} jours. Symptômes {{ symptom_days_low }}–{{ symptom_days_high }} jours.
+
+Fraction symptomatique {{ symptomatic_low }}–{{ symptomatic_high }}. Sensibilité {{ sensitivity_low }}–{{ sensitivity_high }}.
+
+![Priors]({{ figure.priors }})
+
+---
+
+# L'inférence
+
+{{ method }}, {{ chains }} chaînes, {{ warmup }} pas d'échauffement, {{ draws }} tirages.
+
+R̂ sous {{ max_rhat }}, ESS au moins {{ min_ess }}.
+
+![Priors utilisés par NUTS]({{ figure.priors }})
+
+---
+
+# Ce que les données changent
+
+Un paramètre est identifié si son intervalle rétrécit sous {{ well_below }} fois le prior.
+
+{{ posterior.status }}
+
+![Trajectoires avant les données]({{ figure.prior_predictive }})
+
+---
+
+# Projections
+
+{{ prior_draws }} trajectoires a priori de {{ prior_days }} jours, avec bruit d'observation.
+
+{{ growth_sentence }}
+
+![Éventail]({{ figure.prior_predictive }})
+
+---
+
+# Coût et risque
+
+On garde le paquet le moins coûteux avec P(saturation) ≤ {{ alpha }}.
+
+Sans posterior, le graphe est l'échelle de coût, pas une probabilité inventée.
+
+![Coûts]({{ figure.costs }})
+
+---
+
+# Recommandation
+
+Délai {{ delay_days }} jours, durée minimale {{ min_policy_days }} jours, respect {{ compliance }}.
+
+Masque, isolement, quarantaine, distanciation, confinement. La quarantaine ne se combine pas avec l'isolement.
+
+![Échelle de coût]({{ figure.costs }})
+
+---
+
+# Calibration
+
+{{ course_sentence }}
+
+{{ course_interpretation }}
+
+![Fiabilité]({{ figure.reliability }})
+
+---
+
+# Limites
+
+Le modèle ne voit pas la ville cachée. Il est plus simple qu'elle, exprès.
+
+Niveaux de stochasticité 0 à 3. Variante d'inférence {{ variant }}.
+
+![La ville vue par le modèle]({{ figure.compartments }})

@@ -1,0 +1,20 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.4
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^(src/epidemic|app|tests)/
+      - id: ruff-format
+        files: ^(src/epidemic|app|tests)/
+
+  # Même interpréteur que la CI : l'environnement isolé du miroir
+  # mypy ne voit pas numpy, jax ni jinja2.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run --frozen mypy src/epidemic
+        language: system
+        pass_filenames: false
+        files: ^src/epidemic/

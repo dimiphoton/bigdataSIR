@@ -1,0 +1,5 @@
+# Objectif de décision : rester sous ces plafonds jusqu'à la fin janvier.
+
+max_hospitalized: 1500
+max_critical: 300
+horizon_end: "2021-01-31"

@@ -1,1 +1,15 @@
 .ipynb_checkpoints
+
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.streamlit/
+.coverage
+htmlcov/
+
+data/generated/*
+!data/generated/.gitkeep
+
