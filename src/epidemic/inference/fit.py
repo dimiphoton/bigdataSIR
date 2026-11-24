@@ -10,6 +10,7 @@ import numpy as np
 import numpyro
 from numpyro.infer import MCMC, NUTS, SVI, Predictive, Trace_ELBO, log_likelihood
 from numpyro.infer.autoguide import AutoNormal
+from numpyro.infer.initialization import init_to_median
 
 from epidemic.config import InferenceConfig, load_inference_config, resolve_path
 from epidemic.inference.diagnostics import (
@@ -101,7 +102,13 @@ def _run_nuts(
     show_progress: bool,
 ) -> tuple[az.InferenceData, None]:
     nuts = settings.nuts
-    kernel = NUTS(seirh_model, target_accept_prob=nuts.target_accept)
+    # Médiane des priors : un tirage uniforme dans l'espace libre part trop loin,
+    # le pas s'effondre et la chaîne ne quitte plus ce point.
+    kernel = NUTS(
+        seirh_model,
+        target_accept_prob=nuts.target_accept,
+        init_strategy=init_to_median(num_samples=100),
+    )
     mcmc = MCMC(
         kernel,
         num_warmup=nuts.num_warmup,
@@ -233,6 +240,9 @@ def configured(
     seed: int | None = None,
     strict: bool | None = None,
     save_plots: bool | None = None,
+    num_chains: int | None = None,
+    num_warmup: int | None = None,
+    num_samples: int | None = None,
 ) -> InferenceConfig:
     """Copie les réglages en ne changeant que les options demandées."""
     updates: dict[str, Any] = {}
@@ -250,6 +260,15 @@ def configured(
         updates["diagnostics"] = settings.diagnostics.model_copy(
             update={"strict": strict}
         )
+    nuts_update: dict[str, int] = {}
+    if num_chains is not None:
+        nuts_update["num_chains"] = num_chains
+    if num_warmup is not None:
+        nuts_update["num_warmup"] = num_warmup
+    if num_samples is not None:
+        nuts_update["num_samples"] = num_samples
+    if nuts_update:
+        updates["nuts"] = settings.nuts.model_copy(update=nuts_update)
     if not updates:
         return settings
     return settings.model_copy(update=updates)

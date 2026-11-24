@@ -9,6 +9,7 @@ from dataclasses import dataclass
 import jax
 import jax.numpy as jnp
 import numpy as np
+import pandas as pd
 
 from epidemic.config import InferenceConfig
 from epidemic.model.age_structure import AgeStructure
@@ -190,9 +191,10 @@ def _extend_paths(
     breakpoints = jnp.asarray(settings.beta_breakpoints, dtype=jnp.int32)
 
     def one_beta(past: jax.Array, scale: jax.Array, shock: jax.Array) -> jax.Array:
+        # Même borne que dans le modèle : le tirage brut peut dépasser le clip.
         if settings.beta_mode == "weekly_rw":
-            return extend_weekly(past, scale, shock)
-        return extend_piecewise(past, scale, shock, breakpoints)
+            return extend_weekly(past, jnp.clip(scale, 0.0, 1.0), shock)
+        return extend_piecewise(past, jnp.clip(scale, 0.0, 2.0), shock, breakpoints)
 
     beta_full = jax.vmap(one_beta)(jnp.asarray(beta), jnp.asarray(sigma), future_beta)
     p_full = jax.vmap(extend_probability)(
@@ -423,6 +425,120 @@ def _sample_log1p(key: jax.Array, mean: np.ndarray) -> np.ndarray:
     return np.asarray(
         jnp.expm1(jnp.log1p(jnp.clip(jnp.asarray(mean), 0.0, None)) + noisy)
     ).clip(0)
+
+
+# Niveau du jour d'horizon : cas du jour, lits occupés.
+_LEVEL_SERIES = ("num_positive", "num_hospitalised", "num_critical")
+# Somme sur la fenêtre : cas, infections réelles, décès.
+_SUM_SERIES = ("num_positive", "new_infections", "death_increments")
+
+
+def projection_tables(
+    draws: PredictiveDraws,
+    *,
+    origin_day: int,
+    horizons: list[int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Table hebdomadaire et table journalière de la projection.
+
+    L'origine est le dernier jour observé. L'horizon 7 est le bulletin suivant.
+    """
+    if origin_day < 1:
+        raise ValueError("Le jour d'origine commence à 1.")
+    if not horizons or any(horizon < 1 for horizon in horizons):
+        raise ValueError("Les horizons doivent être des nombres de jours positifs.")
+    n_days = _day_count(draws)
+    if origin_day > n_days:
+        raise ValueError("La projection ne couvre pas le jour d'origine.")
+    daily = _daily_frame(draws, origin_day, n_days)
+    weekly_rows: list[dict[str, float | int | str]] = []
+    for horizon in horizons:
+        target = origin_day + horizon
+        if target > n_days:
+            raise ValueError(f"L'horizon {horizon} dépasse la projection.")
+        target_index = target - 1
+        window = slice(origin_day, target_index + 1)
+        for name in _LEVEL_SERIES:
+            values = _series(draws, name)[:, target_index]
+            weekly_rows.append(
+                _weekly_row(origin_day, horizon, target, name, "niveau", values)
+            )
+        for name in _SUM_SERIES:
+            values = _series(draws, name)[:, window].sum(axis=1)
+            weekly_rows.append(
+                _weekly_row(origin_day, horizon, target, name, "somme", values)
+            )
+    weekly = pd.DataFrame(weekly_rows)
+    return weekly, daily
+
+
+def _day_count(draws: PredictiveDraws) -> int:
+    count = int(draws.num_positive.shape[1])
+    names = _LEVEL_SERIES + _SUM_SERIES
+    for name in names:
+        if _series(draws, name).shape[1] != count:
+            raise ValueError(f"{name} n'a pas le même nombre de jours.")
+    return count
+
+
+def _series(draws: PredictiveDraws, name: str) -> np.ndarray:
+    values = np.asarray(getattr(draws, name), dtype=float)
+    if values.ndim != 2 or values.shape[0] < 1:
+        raise ValueError(f"{name} a la forme (tirages, jours).")
+    return values
+
+
+def _daily_frame(draws: PredictiveDraws, origin_day: int, n_days: int) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    day = np.arange(1, n_days + 1)
+    for name in dict.fromkeys(_LEVEL_SERIES + _SUM_SERIES):
+        samples = _series(draws, name)
+        low90, low50, median, high50, high90 = _quantiles(samples)
+        for index in range(n_days):
+            rows.append(
+                {
+                    "day": int(day[index]),
+                    "role": "observe" if day[index] <= origin_day else "projection",
+                    "series": name,
+                    "median": float(median[index]),
+                    "low50": float(low50[index]),
+                    "high50": float(high50[index]),
+                    "low90": float(low90[index]),
+                    "high90": float(high90[index]),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _weekly_row(
+    origin_day: int,
+    horizon: int,
+    target: int,
+    series: str,
+    kind: str,
+    values: np.ndarray,
+) -> dict[str, float | int | str]:
+    low90, _low50, median, _high50, high90 = _quantiles(values[:, None])
+    return {
+        "origin_day": origin_day,
+        "horizon": horizon,
+        "target_day": target,
+        "series": series,
+        "kind": kind,
+        "median": float(median[0]),
+        "low90": float(low90[0]),
+        "high90": float(high90[0]),
+    }
+
+
+def _quantiles(
+    samples: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Bandes à 50 % et 90 %, plus la médiane. Axe 0 : les tirages."""
+    low90, low50, median, high50, high90 = np.quantile(
+        samples, [0.05, 0.25, 0.5, 0.75, 0.95], axis=0
+    )
+    return low90, low50, median, high50, high90
 
 
 def _sample_beta_binomial(

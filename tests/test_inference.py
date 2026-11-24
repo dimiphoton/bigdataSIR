@@ -17,7 +17,7 @@ from epidemic.inference.metrics import (
     identifiability_table,
     log_score,
 )
-from epidemic.inference.predict import extend_weekly
+from epidemic.inference.predict import PredictiveDraws, extend_weekly, projection_tables
 from epidemic.inference.validation import load_course_series, simulate_public_series
 
 
@@ -111,6 +111,37 @@ def test_compare_requires_log_likelihood() -> None:
     idata = az.from_dict(posterior={"beta0": np.ones((1, 5))})
     with pytest.raises(ValueError, match="log_likelihood"):
         compare_criteria({"A": idata, "B": idata})
+
+
+def test_weekly_projection_reads_the_next_bulletin() -> None:
+    """Deux tirages, 7 jours observés, horizon 7. Le jour 14 est la cible."""
+    past = np.ones((2, 7))
+    future = np.array([[2.0] * 7, [4.0] * 7])
+    series = np.concatenate([past, future], axis=1)
+    draws = PredictiveDraws(
+        num_positive=series,
+        num_tested=series,
+        num_hospitalised=series,
+        num_critical=series,
+        death_increments=series,
+        new_infections=series,
+        expected_confirmed=series,
+        false_negatives=series,
+        prevalence=series,
+        hospitalized=series,
+        critical=series,
+    )
+    weekly, daily = projection_tables(draws, origin_day=7, horizons=[7])
+    level = weekly[
+        (weekly["series"] == "num_hospitalised") & (weekly["kind"] == "niveau")
+    ]
+    total = weekly[(weekly["series"] == "num_positive") & (weekly["kind"] == "somme")]
+    assert int(level["target_day"].iloc[0]) == 14
+    assert float(level["median"].iloc[0]) == 3.0
+    assert float(total["median"].iloc[0]) == 21.0
+    projected = daily[daily["role"] == "projection"]
+    projected = projected[projected["series"] == "num_positive"]
+    assert len(projected) == 7
 
 
 def test_zero_volatility_does_not_move_beta() -> None:

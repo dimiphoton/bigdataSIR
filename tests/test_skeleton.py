@@ -62,6 +62,7 @@ def test_fit_help_is_available() -> None:
     result = RUNNER.invoke(app, ["fit", "--help"])
     assert result.exit_code == 0
     assert "svi" in result.stdout
+    assert "chaînes" in result.stdout
 
 
 def test_generated_data_dir_exists() -> None:

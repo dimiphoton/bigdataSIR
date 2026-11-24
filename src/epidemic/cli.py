@@ -277,6 +277,18 @@ def fit(
         ),
     ] = 0,
     seed: Annotated[int | None, typer.Option("--seed")] = None,
+    chains: Annotated[
+        int | None,
+        typer.Option("--chains", min=1, help="Nombre de chaînes NUTS."),
+    ] = None,
+    warmup: Annotated[
+        int | None,
+        typer.Option("--warmup", min=1, help="Pas d'échauffement NUTS."),
+    ] = None,
+    samples: Annotated[
+        int | None,
+        typer.Option("--samples", min=1, help="Tirages conservés par chaîne NUTS."),
+    ] = None,
     strict: Annotated[
         bool | None,
         typer.Option(
@@ -304,6 +316,9 @@ def fit(
         beta_mode=beta_mode,
         seed=seed,
         strict=strict,
+        num_chains=chains,
+        num_warmup=warmup,
+        num_samples=samples,
     )
     series: ObservationSeries
     if source == "course":
@@ -337,6 +352,38 @@ def fit(
         typer.echo(f"ELBO final : {result.elbo:.1f}.")
     if result.output_path is not None:
         typer.echo(f"Posterior : {result.output_path}")
+        weekly_path, daily_path = _write_weekly_projection(result)
+        typer.echo(f"Projection hebdomadaire : {weekly_path}")
+        typer.echo(f"Projection journalière : {daily_path}")
+
+
+def _write_weekly_projection(result: object) -> tuple[Path, Path]:
+    """Écrit la projection à 7, 14 et 21 jours à côté du posterior."""
+    from epidemic.inference.fit import FitResult
+    from epidemic.inference.predict import posterior_predictive, projection_tables
+    from epidemic.model.age_structure import load_age_structure
+
+    if not isinstance(result, FitResult) or result.output_path is None:
+        raise ValueError("L'ajustement n'a pas de fichier posterior.")
+    horizon = max(result.settings.horizons)
+    predicted = posterior_predictive(
+        result.idata,
+        load_age_structure(result.settings.age_groups),
+        result.settings,
+        n_future=horizon,
+        seed=result.settings.seed + 2,
+    )
+    weekly, daily = projection_tables(
+        predicted,
+        origin_day=result.n_days,
+        horizons=list(result.settings.horizons),
+    )
+    stem = result.output_path.with_suffix("")
+    weekly_path = stem.parent / f"{stem.name}-weekly.csv"
+    daily_path = stem.parent / f"{stem.name}-daily.csv"
+    weekly.to_csv(weekly_path, index=False)
+    daily.to_csv(daily_path, index=False)
+    return weekly_path, daily_path
 
 
 @app.command()
