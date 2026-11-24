@@ -2,8 +2,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import numpyro
-from numpyro.infer import MCMC, NUTS, SVI, Trace_ELBO, AutoNormal
-from numpyro.optim import Adam
+from numpyro.infer import MCMC, NUTS, SVI, Trace_ELBO
+from numpyro.infer.autoguide import AutoNormal
 from typing import Dict, Any, Optional, Union, Tuple
 from build_model_numpyro import seir_model
 

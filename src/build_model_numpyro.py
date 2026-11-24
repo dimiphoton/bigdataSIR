@@ -1,7 +1,7 @@
 import jax.numpy as jnp
 import numpyro
 import numpyro.distributions as dist
-from simulator import simulate_symbolic  # Must be JAX-compatible
+from simulate import simulate_symbolic  # Must be JAX-compatible
 
 def seir_model(observed_cases, initial_state, N, days):
     """

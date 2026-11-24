@@ -54,25 +54,35 @@ def seir_step(state: jnp.ndarray, params: Dict[str, Any], N: float) -> Tuple[jnp
 
 
 def simulate_symbolic(
-    initial_state: jnp.ndarray, 
-    params: Dict[str, Any], 
-    N: float, 
+    initial_state: jnp.ndarray,
+    params: Dict[str, Any],
+    N: float,
     days: int
 ) -> Tuple[jnp.ndarray, jnp.ndarray]:
     """
     JAX symbolic simulation (for inference with NumPyro).
-    
+
     Returns:
         - trajectory: (days+1, 7)
         - new_infections: (days,)
     """
     def step_fn(state, _):
+        # Calculate the next state and new infections
         new_state, new_infections = seir_step(state, params, N)
-        return new_state, new_infections
+        # Return the new state for the next step's input (carry),
+        # and also return it as an output to be collected.
+        return new_state, (new_state, new_infections)
 
-    trajectory, new_infections = lax.scan(step_fn, initial_state, xs=None, length=days)
-    trajectory = jnp.concatenate([initial_state[None, :], trajectory], axis=0)
-    return trajectory, new_infections
+    # Run the scan. The second returned value will be a tuple
+    # containing the stacked history of states and new infections.
+    final_state, (trajectory, new_infections) = lax.scan(
+        step_fn, initial_state, xs=None, length=days
+    )
+
+    # Prepend the initial state to the collected trajectory
+    full_trajectory = jnp.concatenate([initial_state[None, :], trajectory], axis=0)
+    
+    return full_trajectory, new_infections
 
 
 # ---------------------- NumPy (deterministic) version ----------------------

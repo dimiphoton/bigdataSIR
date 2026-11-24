@@ -58,20 +58,20 @@ Je refais tout le projet proprement. L'objectif est un travail de qualité profe
 
 `old/` et `main.py` sont obsolètes. Ne les supprime pas, mais ne t'en sers pas.
 
-**Langue** : documentation, README, rapport et docstrings en **français**. Noms de variables et code en anglais.
+**Langue : tout le projet est en anglais** : code, noms de variables, docstrings, commentaires, README, documentation (`docs/`), rapport, bulletins, présentation, interface Streamlit, messages de la CLI, messages de commit et PR. Ce prompt est rédigé en français, mais **aucun texte en français ne doit apparaître dans le dépôt**. Les titres de fichiers donnés ici en français sont à traduire : par exemple `reports/rapport.qmd` devient `reports/report.qmd`, et la branche s'appelle `bayesian-rewrite`.
 
 ---
 
 ## Phase 1 – Branche et squelette du projet
 
 1. Vérifie que l'arbre de travail est propre (`git status`). S'il ne l'est pas, montre-moi les changements avant de faire quoi que ce soit.
-2. Crée et bascule sur une nouvelle branche : `git switch -c refonte-bayesienne`.
+2. Crée et bascule sur une nouvelle branche : `git switch -c bayesian-rewrite`.
 3. Mets en place une structure de projet professionnelle :
 
 ```
 bigdataSIR/
 ├── pyproject.toml          # géré avec uv ; Python 3.11+
-├── README.md               # en français : objectif, installation, utilisation, résultats
+├── README.md               # in English: goal, installation, usage, results
 ├── Makefile                # make install / test / lint / simulate / fit / report / app
 ├── configs/                # YAML : simulateur, priors, scénarios, seuils
 ├── data/
@@ -345,7 +345,7 @@ Processus d'observation à implémenter :
 
 ## Phase 5 – Rendu professionnel
 
-- **Rapport** `reports/rapport.qmd` en français, exporté en HTML et PDF :
+- **Rapport** `reports/report.qmd` en anglais, exporté en HTML et PDF :
   1. contexte ;
   2. données ;
   3. modèle (graphe des compartiments, équations, priors justifiés) ;
@@ -357,9 +357,9 @@ Processus d'observation à implémenter :
   9. calibration en fin de partie ;
   10. limites ;
   11. reproductibilité.
-- **Documentation du framework bayésien : livrable prioritaire.** Deux fichiers markdown en français, **générés par le projet** avec `make docs`. Ce sont des gabarits Jinja2 (`docs/templates/*.md.j2`) remplis à partir des configs et des résultats (`.nc`, scores). Ainsi, tous les chiffres, tableaux de priors et figures restent synchronisés avec le code. Aucun chiffre n'est tapé à la main.
+- **Documentation du framework bayésien : livrable prioritaire.** Deux fichiers markdown en anglais, **générés par le projet** avec `make docs`. Ce sont des gabarits Jinja2 (`docs/templates/*.md.j2`) remplis à partir des configs et des résultats (`.nc`, scores). Ainsi, tous les chiffres, tableaux de priors et figures restent synchronisés avec le code. Aucun chiffre n'est tapé à la main.
 
-  **1. `docs/framework-bayesien.md`** : document long, à lire, pédagogique mais rigoureux. Il doit pouvoir être compris par quelqu'un qui connaît les probabilités mais pas l'épidémiologie. Chaque section suit la même progression : intuition, puis formalisation (équations LaTeX), puis choix fait dans le projet et justification, puis ce qu'on en a tiré (figure ou chiffre généré). Contenu minimal :
+  **1. `docs/bayesian-framework.md`** : document long, à lire, pédagogique mais rigoureux. Il doit pouvoir être compris par quelqu'un qui connaît les probabilités mais pas l'épidémiologie. Chaque section suit la même progression : intuition, puis formalisation (équations LaTeX), puis choix fait dans le projet et justification, puis ce qu'on en a tiré (figure ou chiffre généré). Contenu minimal :
   1. **Pourquoi bayésien** : quantifier l'incertitude, intégrer les connaissances des consignes, produire des probabilités utiles à la décision, comme P(saturation). Comparaison avec l'approche par moindres carrés du rapport de 2020 (`proj0016-covid/Modelling-COVID-20`).
   2. **Le problème** : réalité cachée, données partielles et bruitées. Distinction entre infectés, testés et confirmés ; sous-déclaration ; faux négatifs.
   3. **Le modèle génératif**, de bout en bout :
@@ -388,21 +388,59 @@ Processus d'observation à implémenter :
      - règle de décision (coût minimal sous P(saturation) ≤ α), règles conditionnelles, analyse de sensibilité.
   10. **Calibration** : les probabilités annoncées se sont-elles réalisées ? Diagramme de fiabilité, Brier, CRPS.
   11. **Limites et hypothèses** : reprend `docs/hypotheses.md`, avec les écarts entre le modèle et la réalité simulée.
-  12. **Glossaire** (FR / EN) et **références** (Chowell 2017, Gelman et al. *Bayesian Workflow* 2020, documentation NumPyro, simulateur IISc…).
+  12. **Glossary** et **références** (Chowell 2017, Gelman et al. *Bayesian Workflow* 2020, documentation NumPyro, simulateur IISc…).
 
-  **2. `docs/presentation.md`** : présentation courte, 10 à 12 diapositives au format **Marp** (séparateur `---`, exportable en PDF ou HTML avec `make slides`). Une idée par diapositive, une figure générée par diapositive, peu de texte :
-  1. titre ;
-  2. le problème : ville, données partielles, décision à prendre ;
-  3. pourquoi bayésien ;
-  4. le modèle (schéma des compartiments) ;
-  5. les priors (tableau résumé) ;
-  6. l'inférence et les diagnostics ;
-  7. ce que les données ont appris (prior face à posterior) ;
-  8. projections ;
-  9. P(saturation) par scénario et frontière coût / risque ;
-  10. recommandation ;
-  11. calibration ;
-  12. limites et suite.
+  **2. Deux présentations Marp, pour deux publics différents** : `docs/slides/recruiter.md` et `docs/slides/technical.md`, exportées en PDF et HTML avec `make slides`.
+
+  > **Attention : les présentations sont le point faible habituel.** Je ne veux pas de « slop » : murs de puces, jargon, titres vides comme « Overview » ou « Results », phrases génériques qui pourraient s'appliquer à n'importe quel projet. Le plan ci-dessous est **imposé**. Ne l'invente pas, ne l'enrichis pas, remplis-le.
+
+  **Règles communes, vérifiées automatiquement par `scripts/lint_slides.py` dans la CI.**
+  - **Le titre de chaque diapositive est une phrase-conclusion** (sujet, verbe, chiffre si possible), par exemple « Without action, hospitals saturate with 87% probability by Dec 20 ». Jamais un mot-étiquette comme « Results ». Le linter refuse les titres de moins de 5 mots.
+  - **Une seule idée par diapositive.** Au maximum **40 mots** de texte hors titre pour la présentation recruteur, **60 mots** pour la technique.
+  - **Au maximum 3 puces**, et pas de puces imbriquées.
+  - **Chaque diapositive porte une figure générée ou un chiffre clé en grand**, sauf le titre et la conclusion. Pas d'image décorative, pas d'icône, pas d'emoji.
+  - **Tous les chiffres viennent des résultats**, injectés par le gabarit Jinja2. Aucun chiffre tapé à la main.
+  - **Mots interdits**, refusés par le linter : *leverage, robust, cutting-edge, seamless, delve, unlock, harness, powerful, comprehensive, state-of-the-art, journey, game-changer*, ainsi que « In this presentation », « Let's dive in », « Key takeaways » utilisé comme titre.
+  - **Figures lisibles en projection** : police ≥ 18 pt, au maximum 3 séries par graphe, légende directement sur les courbes plutôt que dans une boîte, palette cohérente avec le reste du projet (confirmés et estimés toujours de la même couleur).
+  - **Thème Marp sobre**, défini une fois dans `docs/slides/theme.css` : fond blanc, une couleur d'accent, numéro de diapositive en bas.
+  - **Notes de l'orateur** (`<!-- ... -->` sous chaque diapositive) : 2 à 4 phrases de ce que je dois **dire**, qui ne répètent pas l'écran.
+
+  **2a. `recruiter.md` : 7 diapositives, 5 minutes, public non technique** (recruteur, manager). Aucune formule, aucun nom de loi de probabilité, aucun nom de bibliothèque sauf sur la dernière diapositive. Le vocabulaire est celui d'une personne qui doit **prendre une décision**.
+
+  | # | Titre (modèle à remplir) | Contenu |
+  |---|---|---|
+  | 1 | Deciding under uncertainty: steering a simulated epidemic with Bayesian forecasts | nom, date, lien vers l'application |
+  | 2 | A city of 1 million, incomplete data, and a decision every week | 3 éléments du problème : on ne voit que les cas testés, les tests se trompent, il faut décider avant de savoir |
+  | 3 | Confirmed cases show only {{ ratio }}% of real infections | graphe confirmés face aux infections estimées |
+  | 4 | Without action, P(hospital saturation) = {{ p_sat_none }}% | graphe hôpital face à la capacité, en éventail |
+  | 5 | {{ recommended }} keeps the risk below {{ alpha }}% at the lowest social cost | graphe coût face au risque avec la recommandation mise en évidence |
+  | 6 | The forecasts were honest: {{ coverage }}% of outcomes fell inside the 90% ranges | une barre « annoncé / réalisé » |
+  | 7 | What this project shows about how I work | 3 puces sur les compétences démontrées (modélisation, quantification de l'incertitude, aide à la décision) et la pile technique en une ligne |
+
+  **2b. `technical.md` : 12 diapositives, 15 minutes, public data scientist ou jury.**
+
+  | # | Titre (modèle à remplir) | Contenu |
+  |---|---|---|
+  | 1 | Bayesian SEIRH inference and decision support for a simulated epidemic | titre, lien vers le dépôt |
+  | 2 | The analyst sees only noisy, partial observations of a hidden process | schéma réalité cachée → test → données publiées |
+  | 3 | The generative model: age-structured SEIRH with an explicit testing layer | graphe des compartiments généré |
+  | 4 | Priors encode the brief, not guesses | tableau des priors en 6 lignes maximum (les plus importants) ; renvoi vers `bayesian-framework.md` pour la suite |
+  | 5 | NUTS converged: R̂ < {{ rhat_max }}, {{ n_div }} divergences | trace plot et ESS minimal |
+  | 6 | The data pin down {{ n_identified }} of {{ n_params }} parameters | prior face à posterior, avec en couleur les paramètres bien identifiés |
+  | 7 | Testing rate and hospitalisation rate remain confounded | graphe de la loi a posteriori conjointe des deux paramètres |
+  | 8 | Posterior predictive checks reproduce all {{ n_series }} observed series | graphe des données observées dans l'éventail prédictif |
+  | 9 | Forecasts beat naive baselines by {{ crps_gain }}% CRPS at 14 days | graphe en barres : CRPS du modèle face aux références |
+  | 10 | Adaptive triggers dominate fixed policies on the cost–risk frontier | frontière de Pareto : mesures fixes face aux règles conditionnelles |
+  | 11 | Calibration holds up to stochasticity level {{ max_ok_level }} | diagramme de fiabilité par niveau |
+  | 12 | Limits and next steps | 3 limites concrètes, chacune avec la piste correspondante |
+
+  Si un résultat contredit un titre (par exemple si les règles conditionnelles ne dominent pas), **réécris le titre pour dire ce que montrent les données**. Ne force jamais le résultat.
+
+  **Contrôle qualité avant de me rendre les slides :**
+  1. `make slides`, puis exporter chaque diapositive en PNG (`marp --images png`).
+  2. **Regarde chaque PNG** et vérifie : le texte ne déborde pas, la figure est lisible, le titre se comprend sans le reste de la diapositive.
+  3. **Test de lecture des titres seuls** : génère `docs/slides/*_titles.txt` avec uniquement les titres. Lus à la suite, ils doivent raconter toute l'histoire. Montre-les-moi.
+  4. Je valide les titres **avant** que tu finalises les figures.
 
   Tests : `make docs` doit tourner dans la CI ; un test vérifie qu'aucun champ du gabarit n'est resté vide et que toutes les figures référencées existent.
 
@@ -410,26 +448,26 @@ Processus d'observation à implémenter :
 - **Bulletin épidémiologique hebdomadaire en PDF** (`reports/bulletin/`) :
   - généré automatiquement à chaque bulletin du jeu par `epidemic bulletin --day N`, à partir d'un gabarit Quarto ;
   - 2 pages maximum, dans le style d'un bulletin d'agence de santé publique (par exemple Sciensano) :
-    - un encadré « Situation en bref » de 3 à 5 phrases ;
+    - un encadré « Situation at a glance » de 3 à 5 phrases ;
     - les indicateurs clés avec leur tendance par rapport à la semaine précédente (cas, positivité, H, ICU, décès, Rt) ;
     - les graphes de suivi essentiels (semi-log, hôpital face à la capacité, Rt) ;
     - les projections à 14 et 28 jours ;
     - P(saturation) ;
     - la recommandation et les paliers débloqués ;
-  - les probabilités sont **traduites en langage clair** selon l'échelle verbale du GIEC, avec le chiffre à côté :
+  - les probabilités sont **traduites en langage clair** selon l'échelle verbale de l'IPCC (*calibrated uncertainty language*), avec le chiffre à côté :
 
     | Probabilité | Formulation |
     |---|---|
-    | ≥ 99 % | quasi certain |
-    | 90-99 % | très probable |
-    | 66-90 % | probable |
-    | 33-66 % | aussi probable qu'improbable |
-    | 10-33 % | improbable |
-    | 1-10 % | très improbable |
-    | < 1 % | exceptionnellement improbable |
+    | ≥ 99 % | virtually certain |
+    | 90-99 % | very likely |
+    | 66-90 % | likely |
+    | 33-66 % | about as likely as not |
+    | 10-33 % | unlikely |
+    | 1-10 % | very unlikely |
+    | < 1 % | exceptionally unlikely |
 
   - les phrases sont générées par des règles à partir des chiffres, sans LLM, pour que le bulletin reste reproductible ;
-  - les mots « estimé » ou « confirmé » sont toujours précisés.
+  - les mots *estimated* ou *confirmed* sont toujours précisés.
 - **Tableau de calibration en fin de partie** (`forecast/scoring.py`), affiché à la fin du jeu et dans le rapport :
   - pour chaque bulletin, chaque horizon (7, 14 et 28 jours) et chaque série (positifs, H, ICU, décès) : la valeur réalisée tombe-t-elle dans l'intervalle à 50 % et à 90 % ?
   - **couverture empirique** par rapport à la couverture nominale, par exemple « intervalles à 90 % : 85 % de réussite sur 48 prévisions » ;
@@ -441,11 +479,11 @@ Processus d'observation à implémenter :
 - **README** : badge CI, installation en 3 commandes, `make all` qui reproduit tous les résultats, captures de l'application.
 - **Application Streamlit** déployable : deux modes, « Jouer » (le simulateur avec décisions) et « Analyser » (ajustement du modèle sur des données chargées).
 - **Qualité** :
-  - typage complet et docstrings en français ;
+  - typage complet et docstrings en anglais ;
   - aucune valeur codée en dur : tout passe par `configs/` ;
   - graines fixées partout ;
   - couverture de tests ≥ 80 % sur `simulator/` et `model/`.
-- **Commits** : petits et lisibles, en Conventional Commits, sur la branche `refonte-bayesienne`. Ouvre une PR vers `main` à la fin, avec un résumé.
+- **Commits** : petits et lisibles, en Conventional Commits, sur la branche `bayesian-rewrite`. Ouvre une PR vers `main` à la fin, avec un résumé.
 
 ---
 
